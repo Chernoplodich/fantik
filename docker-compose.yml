@@ -1,0 +1,184 @@
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-dev}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_RENDERER: ${LOG_RENDERER:-console}
+  RELEASE: ${RELEASE:-}
+  BOT_TOKEN: ${BOT_TOKEN}
+  ADMIN_TG_IDS: ${ADMIN_TG_IDS}
+  BOT_RUN_MODE: ${BOT_RUN_MODE:-polling}
+  WEBHOOK_BASE_URL: ${WEBHOOK_BASE_URL:-}
+  WEBHOOK_PATH: ${WEBHOOK_PATH:-/webhook}
+  WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+  WEBHOOK_HOST: ${WEBHOOK_HOST:-0.0.0.0}
+  WEBHOOK_PORT: ${WEBHOOK_PORT:-8080}
+  HEALTH_HOST: ${HEALTH_HOST:-0.0.0.0}
+  HEALTH_PORT: ${HEALTH_PORT:-8080}
+  METRICS_PORT: ${METRICS_PORT:-8081}
+  POSTGRES_USER: ${POSTGRES_USER:-fantik}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DB:-fantik}
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  POSTGRES_POOL_SIZE: ${POSTGRES_POOL_SIZE:-10}
+  POSTGRES_MAX_OVERFLOW: ${POSTGRES_MAX_OVERFLOW:-10}
+  POSTGRES_POOL_TIMEOUT: ${POSTGRES_POOL_TIMEOUT:-30}
+  POSTGRES_POOL_RECYCLE: ${POSTGRES_POOL_RECYCLE:-1800}
+  POSTGRES_ECHO: ${POSTGRES_ECHO:-false}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  REDIS_FSM_DB: ${REDIS_FSM_DB:-1}
+  REDIS_TASKIQ_DB: ${REDIS_TASKIQ_DB:-2}
+  REDIS_CACHE_DB: ${REDIS_CACHE_DB:-0}
+  MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
+  MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+  SEARCH_BACKEND: ${SEARCH_BACKEND:-meili}
+  TASKIQ_QUEUE_DEFAULT: ${TASKIQ_QUEUE_DEFAULT:-fantik:tasks}
+  TASKIQ_QUEUE_BROADCAST: ${TASKIQ_QUEUE_BROADCAST:-fantik:broadcast}
+  BROADCAST_RATE: ${BROADCAST_RATE:-25}
+  BROADCAST_RATE_CAPACITY: ${BROADCAST_RATE_CAPACITY:-25}
+  ALLOW_PAID_BROADCAST: ${ALLOW_PAID_BROADCAST:-false}
+  DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Moscow}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.01}
+  MAX_CHAPTERS_PER_FIC: ${MAX_CHAPTERS_PER_FIC:-200}
+  MAX_CHAPTER_CHARS: ${MAX_CHAPTER_CHARS:-100000}
+  MAX_FICS_PER_DAY: ${MAX_FICS_PER_DAY:-3}
+  MAX_REPORTS_PER_DAY: ${MAX_REPORTS_PER_DAY:-20}
+  MAX_USER_UPDATES_PER_MIN: ${MAX_USER_UPDATES_PER_MIN:-30}
+  PAGE_LIMIT_UTF16: ${PAGE_LIMIT_UTF16:-3900}
+  TZ: UTC
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantik}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-fantik}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fantik} -d ${POSTGRES_DB:-fantik}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      # Meilisearch принимает только development|production (наш APP_ENV=dev → development)
+      MEILI_ENV: ${MEILI_ENV:-development}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      # 127.0.0.1 (не localhost), т.к. в alpine-образе localhost резолвится в IPv6, а Meili на IPv4
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ЕДИНСТВЕННЫЙ сервис с `build:` — он собирает образ fantik/app:local.
+  # Все остальные сервисы берут этот же образ и переключаются через ENTRYPOINT_MODULE.
+  bot:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    image: fantik/app:local
+    environment:
+      <<: *app-env
+      ENTRYPOINT_MODULE: app.presentation.bot.main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  migrate:
+    image: fantik/app:local
+    pull_policy: never
+    environment:
+      <<: *app-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  worker:
+    image: fantik/app:local
+    pull_policy: never
+    environment:
+      <<: *app-env
+      ENTRYPOINT_MODULE: app.presentation.worker.main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # Воркеры пока в idle loop без HTTP health-endpoint'а (добавим в Этапе 7 hardening).
+    healthcheck:
+      disable: true
+
+  worker-broadcast:
+    image: fantik/app:local
+    pull_policy: never
+    environment:
+      <<: *app-env
+      ENTRYPOINT_MODULE: app.presentation.worker.broadcast_main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      bot:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+  scheduler:
+    image: fantik/app:local
+    pull_policy: never
+    environment:
+      <<: *app-env
+      ENTRYPOINT_MODULE: app.presentation.worker.scheduler_main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+volumes:
+  postgres_data:
+  redis_data:
+  meili_data:

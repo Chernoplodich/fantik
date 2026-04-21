@@ -1,0 +1,54 @@
+services:
+  bot:
+    volumes:
+      - ./src:/app/src:cached
+      - ./migrations:/app/migrations:cached
+      - ./alembic.ini:/app/alembic.ini:cached
+    environment:
+      LOG_LEVEL: DEBUG
+      LOG_RENDERER: console
+      POSTGRES_ECHO: "false"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+
+  worker:
+    volumes:
+      - ./src:/app/src:cached
+      - ./migrations:/app/migrations:cached
+      - ./alembic.ini:/app/alembic.ini:cached
+    environment:
+      LOG_LEVEL: DEBUG
+
+  worker-broadcast:
+    volumes:
+      - ./src:/app/src:cached
+      - ./migrations:/app/migrations:cached
+      - ./alembic.ini:/app/alembic.ini:cached
+
+  scheduler:
+    volumes:
+      - ./src:/app/src:cached
+      - ./migrations:/app/migrations:cached
+      - ./alembic.ini:/app/alembic.ini:cached
+
+  migrate:
+    volumes:
+      - ./src:/app/src:cached
+      - ./migrations:/app/migrations:cached
+      - ./alembic.ini:/app/alembic.ini:cached
+
+  # Нестандартные порты, чтобы не конфликтовать с локально запущенными сервисами.
+  # Подключение с хоста: psql -h localhost -p 55432, redis-cli -p 56379, curl localhost:57700.
+  # Внутри compose-сети сервисы всё равно обращаются по стандартным портам (postgres:5432 и т.д.).
+  postgres:
+    ports:
+      - "55432:5432"
+
+  redis:
+    ports:
+      - "56379:6379"
+
+  meilisearch:
+    ports:
+      - "57700:7700"

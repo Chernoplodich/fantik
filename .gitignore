@@ -1,0 +1,66 @@
+# ---------- secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+.nox/
+
+# ---------- virtualenv ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- uv ----------
+# uv.lock is committed; only lock-related noise excluded
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ---------- docker / runtime ----------
+postgres_data/
+redis_data/
+meili_data/
+*.log
+logs/
+
+# ---------- CI artifacts ----------
+coverage.xml
+test-results/
+.ci-cache/

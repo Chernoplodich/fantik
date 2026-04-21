@@ -1,0 +1,39 @@
+# ---------- secrets (никогда в образ) ----------
+.env
+.env.*
+!.env.example
+
+# ---------- dev-only ----------
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+
+# ---------- docs/tests не нужны в рантайме ----------
+docs/
+tests/
+
+# ---------- git/ide ----------
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# ---------- runtime volumes ----------
+postgres_data/
+redis_data/
+meili_data/
+*.log
+logs/
+
+# ---------- lock-only ----------
+# uv.lock копируется отдельно в builder-стадии Dockerfile

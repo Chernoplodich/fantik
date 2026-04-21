@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.27"
+          enable-cache: true
+      - name: Python 3.12
+        run: uv python install 3.12
+      - name: Install deps
+        run: uv sync --frozen
+      - run: uv run ruff format --check src tests
+      - run: uv run ruff check src tests
+      - run: uv run mypy src
+      - run: uv run lint-imports
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_USER: fantik
+          POSTGRES_DB: fantik_test
+        options: >-
+          --health-cmd "pg_isready -U fantik"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ["5432:5432"]
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ["6379:6379"]
+      meilisearch:
+        image: getmeili/meilisearch:v1.11
+        env:
+          MEILI_MASTER_KEY: ci-secret-32-chars-or-more-padding
+          MEILI_NO_ANALYTICS: "true"
+          MEILI_ENV: development
+        ports: ["7700:7700"]
+    env:
+      APP_ENV: test
+      BOT_TOKEN: "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN"
+      ADMIN_TG_IDS: "1"
+      POSTGRES_USER: fantik
+      POSTGRES_PASSWORD: ci
+      POSTGRES_DB: fantik_test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://localhost:6379/0
+      MEILI_URL: http://localhost:7700
+      MEILI_MASTER_KEY: ci-secret-32-chars-or-more-padding
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.27"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Wait for Meili
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:7700/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - run: uv run alembic upgrade head
+      - run: uv run pytest --cov=src --cov-report=xml
+      - uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
