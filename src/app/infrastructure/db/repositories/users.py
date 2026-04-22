@@ -57,3 +57,11 @@ class UserRepository(IUserRepository):
             stmt = stmt.where(UserModel.id != int(except_user_id))
         val = (await self._s.execute(stmt.limit(1))).scalar_one_or_none()
         return val is not None
+
+    async def list_staff(self) -> list[UserId]:
+        stmt = select(UserModel.id).where(
+            UserModel.role.in_(("moderator", "admin")),
+            UserModel.banned_at.is_(None),
+        )
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [UserId(r) for r in rows]

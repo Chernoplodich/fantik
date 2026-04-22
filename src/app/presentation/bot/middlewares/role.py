@@ -14,9 +14,12 @@ from dishka import AsyncContainer
 from dishka.integrations.aiogram import CONTAINER_NAME
 
 from app.application.users.ports import IUserRepository
+from app.core.logging import get_logger
 from app.domain.shared.types import UserId
 from app.domain.users.value_objects import Role
 from app.infrastructure.redis.role_cache import RoleCache
+
+log = get_logger(__name__)
 
 
 class RoleMiddleware(BaseMiddleware):
@@ -26,8 +29,10 @@ class RoleMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        from_user = getattr(event, "from_user", None)
-        if from_user is None or from_user.is_bot:
+        # event для update observer — Update без прямого from_user;
+        # aiogram 3 сам кладёт event_from_user в data при разборе.
+        from_user = data.get("event_from_user") or getattr(event, "from_user", None)
+        if from_user is None or getattr(from_user, "is_bot", False):
             data["role"] = Role.USER
             return await handler(event, data)
 

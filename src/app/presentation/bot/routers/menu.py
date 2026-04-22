@@ -1,4 +1,4 @@
-"""Главное меню: обработчики кнопок-placeholder'ов (для Этапов 2+)."""
+"""Главное меню: placeholder-обработчики для пока не реализованных разделов."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ router = Router(name="menu")
 
 
 @router.callback_query(
-    F.data.in_({"menu:browse", "menu:shelf", "menu:my_works", "menu:new_fic", "menu:mod", "menu:admin"})
+    F.data.in_({"menu:browse", "menu:shelf", "menu:admin"})
 )
 async def stub(cb: CallbackQuery) -> None:
     await cb.answer(t("not_implemented"), show_alert=True)

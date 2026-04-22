@@ -22,8 +22,8 @@ class BanCheckMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        from_user = getattr(event, "from_user", None)
-        if from_user is None or from_user.is_bot:
+        from_user = data.get("event_from_user") or getattr(event, "from_user", None)
+        if from_user is None or getattr(from_user, "is_bot", False):
             return await handler(event, data)
 
         container: AsyncContainer | None = data.get(CONTAINER_NAME)

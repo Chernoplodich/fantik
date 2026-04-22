@@ -25,3 +25,7 @@ class IUserRepository(Protocol):
 
     async def is_nick_taken(self, nick_lower: str, *, except_user_id: UserId | None = None) -> bool:
         ...
+
+    async def list_staff(self) -> list[UserId]:
+        """Вернуть id всех пользователей с ролью moderator/admin (для нотификаций)."""
+        ...

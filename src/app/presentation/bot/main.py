@@ -16,15 +16,17 @@ from app.core.config import RunMode, Settings
 from app.core.di import build_container
 from app.core.logging import get_logger, setup_logging
 from app.infrastructure.redis.pool import build_redis_fsm_pool
-from app.infrastructure.telegram.bot_factory import build_bot
 from app.presentation.bot.health import build_health_app
 from app.presentation.bot.middlewares.ban_check import BanCheckMiddleware
 from app.presentation.bot.middlewares.logging import LoggingMiddleware
 from app.presentation.bot.middlewares.role import RoleMiddleware
 from app.presentation.bot.middlewares.throttle import ThrottleMiddleware
 from app.presentation.bot.middlewares.user_upsert import UserUpsertMiddleware
+from app.presentation.bot.routers import author_create as author_create_router
+from app.presentation.bot.routers import author_manage as author_manage_router
 from app.presentation.bot.routers import errors as errors_router
 from app.presentation.bot.routers import menu as menu_router
+from app.presentation.bot.routers import moderation as moderation_router
 from app.presentation.bot.routers import onboarding as onboarding_router
 from app.presentation.bot.routers import profile as profile_router
 from app.presentation.bot.routers import start as start_router
@@ -40,19 +42,30 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     )
     dp = Dispatcher(storage=storage)
 
-    # Порядок важен: logging → user_upsert → ban_check → throttle → role
+    # Middleware регистрируются позже (после setup_dishka), чтобы они стояли
+    # ПОСЛЕ ContainerMiddleware — иначе data[CONTAINER_NAME] отсутствует.
+    dp.include_router(errors_router.router)
+    dp.include_router(start_router.router)
+    dp.include_router(onboarding_router.router)
+    dp.include_router(profile_router.router)
+    dp.include_router(author_create_router.router)
+    dp.include_router(author_manage_router.router)
+    dp.include_router(moderation_router.router)
+    dp.include_router(menu_router.router)
+    return dp
+
+
+def _register_middlewares(dp: Dispatcher) -> None:
+    """Порядок важен: logging → user_upsert → ban_check → throttle → role.
+
+    Регистрируется ПОСЛЕ setup_dishka, чтобы ContainerMiddleware отработал
+    раньше и положил dishka-контейнер в `data`.
+    """
     dp.update.outer_middleware(LoggingMiddleware())
     dp.update.outer_middleware(UserUpsertMiddleware())
     dp.update.outer_middleware(BanCheckMiddleware())
     dp.update.outer_middleware(ThrottleMiddleware())
     dp.update.outer_middleware(RoleMiddleware())
-
-    dp.include_router(errors_router.router)
-    dp.include_router(start_router.router)
-    dp.include_router(onboarding_router.router)
-    dp.include_router(profile_router.router)
-    dp.include_router(menu_router.router)
-    return dp
 
 
 async def _seed_admins(container: AsyncContainer, settings: Settings) -> None:
@@ -137,14 +150,16 @@ async def main() -> None:
     # Seed админы до старта хэндлеров
     await _seed_admins(container, settings)
 
-    bot: Bot = build_bot(settings)
+    bot: Bot = await container.get(Bot)
 
     # FSM storage на Redis FSM DB
     fsm_pool = build_redis_fsm_pool(settings)
     dp = _build_dispatcher(settings, fsm_pool)
 
-    # Регистрация DI в aiogram — после этого FromDishka[T] работает в хэндлерах
+    # Регистрация DI в aiogram — после этого FromDishka[T] работает в хэндлерах.
+    # setup_dishka добавляет ContainerMiddleware как outer — ДО наших outer middlewares.
     setup_dishka(container=container, router=dp, auto_inject=True)
+    _register_middlewares(dp)
 
     # /healthz + /metrics
     engine: AsyncEngine = await container.get(AsyncEngine)
@@ -162,7 +177,7 @@ async def main() -> None:
         else:
             await _run_webhook(bot, dp, settings, health_app)
     finally:
-        await bot.session.close()
+        # bot.session закроется при container.close() (BotProvider async gen finally)
         await container.close()
 
 
