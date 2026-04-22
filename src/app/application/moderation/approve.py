@@ -98,6 +98,16 @@ class ApproveUseCase:
                 ch.approve(now=now)
                 await self._chapters.save(ch)
 
+            # Для репагинации: при first_publish главы все уже approved (вся книга),
+            # при правке approved-фика — только что переведённые (pending → approved).
+            if was_first_publish:
+                approved_chapters = await self._chapters.list_by_fic_and_statuses(
+                    fic.id, [FicStatus.APPROVED]
+                )
+            else:
+                approved_chapters = list(pending_chapters)
+            approved_chapter_ids = [int(ch.id) for ch in approved_chapters]
+
             await self._audit.log(
                 actor_id=moderator_id,
                 action="fic.approve",
@@ -118,6 +128,7 @@ class ApproveUseCase:
                     "case_id": int(case.id),
                     "first_publish": was_first_publish,
                     "version_id": int(version_id),
+                    "chapter_ids": approved_chapter_ids,
                 },
                 now=now,
             )

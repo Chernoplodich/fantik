@@ -89,6 +89,18 @@ class IFanficRepository(Protocol):
 
     async def count_submitted_today(self, *, author_id: UserId, tz: str) -> int: ...
 
+    async def increment_likes(self, fic_id: FanficId) -> None:
+        """Атомарный UPDATE fanfics SET likes_count = likes_count + 1."""
+        ...
+
+    async def decrement_likes(self, fic_id: FanficId) -> None:
+        """Атомарный UPDATE fanfics SET likes_count = GREATEST(likes_count - 1, 0)."""
+        ...
+
+    async def increment_reads_completed(self, fic_id: FanficId) -> None:
+        """Атомарный UPDATE fanfics SET reads_completed_count = reads_completed_count + 1."""
+        ...
+
 
 class IChapterRepository(Protocol):
     async def get(self, chapter_id: ChapterId) -> Chapter | None: ...

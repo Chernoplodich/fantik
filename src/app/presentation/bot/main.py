@@ -24,11 +24,14 @@ from app.presentation.bot.middlewares.throttle import ThrottleMiddleware
 from app.presentation.bot.middlewares.user_upsert import UserUpsertMiddleware
 from app.presentation.bot.routers import author_create as author_create_router
 from app.presentation.bot.routers import author_manage as author_manage_router
+from app.presentation.bot.routers import browse as browse_router
 from app.presentation.bot.routers import errors as errors_router
 from app.presentation.bot.routers import menu as menu_router
 from app.presentation.bot.routers import moderation as moderation_router
 from app.presentation.bot.routers import onboarding as onboarding_router
 from app.presentation.bot.routers import profile as profile_router
+from app.presentation.bot.routers import reader as reader_router
+from app.presentation.bot.routers import shelf as shelf_router
 from app.presentation.bot.routers import start as start_router
 
 log = get_logger(__name__)
@@ -51,6 +54,9 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     dp.include_router(author_create_router.router)
     dp.include_router(author_manage_router.router)
     dp.include_router(moderation_router.router)
+    dp.include_router(browse_router.router)
+    dp.include_router(reader_router.router)
+    dp.include_router(shelf_router.router)
     dp.include_router(menu_router.router)
     return dp
 

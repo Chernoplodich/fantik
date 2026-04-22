@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +12,6 @@ from app.domain.fanfics.value_objects import MqKind
 from app.domain.moderation.entities import ModerationCase
 from app.domain.moderation.events import (
     ModerationCaseCreated,
-    ModerationCaseUnlocked,
 )
 from app.domain.shared.types import (
     ChapterId,
@@ -22,7 +20,6 @@ from app.domain.shared.types import (
     UserId,
 )
 from app.infrastructure.db.mappers.moderation import (
-    apply_mq_to_model,
     mq_to_domain,
 )
 from app.infrastructure.db.models.moderation_queue import (

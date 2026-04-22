@@ -54,7 +54,7 @@ from app.application.fanfics.update_fanfic import (
 from app.core.config import Settings
 from app.core.errors import DomainError
 from app.domain.fanfics.value_objects import FicStatus
-from app.domain.shared.types import ChapterId, FanficId
+from app.domain.shared.types import ChapterId
 from app.presentation.bot.callback_data.fanfic import (
     AgeRatingCD,
     ChapterActionCD,

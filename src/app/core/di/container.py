@@ -24,6 +24,26 @@ from app.application.fanfics.ports import (
     IReferenceReader,
     ITagRepository,
 )
+from app.application.reading.list_feed import ListFeedUseCase
+from app.application.reading.list_my_shelf import ListMyShelfUseCase
+from app.application.reading.mark_completed import MarkCompletedUseCase
+from app.application.reading.open_fanfic import OpenFanficUseCase
+from app.application.reading.paginate_chapter import PaginateChapterUseCase
+from app.application.reading.ports import (
+    IBookmarksRepository,
+    IChapterPagesRepository,
+    IFanficFeedReader,
+    ILikesRepository,
+    IPageCache,
+    IProgressThrottle,
+    IReadingProgressRepository,
+    IReadsCompletedRepository,
+    IRepaginationQueue,
+)
+from app.application.reading.read_page import ReadPageUseCase
+from app.application.reading.save_progress import SaveProgressUseCase
+from app.application.reading.toggle_bookmark import ToggleBookmarkUseCase
+from app.application.reading.toggle_like import ToggleLikeUseCase
 from app.application.fanfics.revise_after_rejection import (
     ReviseAfterRejectionUseCase,
 )
@@ -52,21 +72,36 @@ from app.core.clock import Clock, SystemClock
 from app.core.config import Settings, get_settings
 from app.infrastructure.db.engine import build_engine, build_sessionmaker
 from app.infrastructure.db.repositories.audit_log import AuditLogRepository
+from app.infrastructure.db.repositories.bookmarks import BookmarksRepository
+from app.infrastructure.db.repositories.chapter_pages import (
+    ChapterPagesRepository,
+)
 from app.infrastructure.db.repositories.chapters import ChapterRepository
+from app.infrastructure.db.repositories.fanfic_feed import FanficFeedReader
 from app.infrastructure.db.repositories.fanfic_versions import (
     FanficVersionRepository,
 )
 from app.infrastructure.db.repositories.fanfics import FanficRepository
+from app.infrastructure.db.repositories.likes import LikesRepository
 from app.infrastructure.db.repositories.moderation import ModerationRepository
 from app.infrastructure.db.repositories.moderation_reasons import ReasonRepository
 from app.infrastructure.db.repositories.outbox import OutboxRepository
+from app.infrastructure.db.repositories.reading_progress import (
+    ReadingProgressRepository,
+)
+from app.infrastructure.db.repositories.reads_completed import (
+    ReadsCompletedRepository,
+)
 from app.infrastructure.db.repositories.reference import ReferenceReader
 from app.infrastructure.db.repositories.tags import TagRepository
 from app.infrastructure.db.repositories.tracking import TrackingRepository
 from app.infrastructure.db.repositories.users import UserRepository
 from app.infrastructure.db.unit_of_work import SqlAlchemyUnitOfWork, UnitOfWork
+from app.infrastructure.redis.page_cache import RedisPageCache
 from app.infrastructure.redis.pool import build_redis_cache_pool
+from app.infrastructure.redis.progress_throttle import RedisProgressThrottle
 from app.infrastructure.redis.role_cache import RoleCache
+from app.infrastructure.tasks.repagination_queue import TaskiqRepaginationQueue
 from app.infrastructure.telegram.bot_factory import build_bot
 from app.infrastructure.telegram.mod_notifier import ModeratorNotifier
 from app.infrastructure.telegram.notifier import AuthorNotifier
@@ -138,6 +173,14 @@ class RedisProvider(Provider):
     def role_cache(self, redis: Redis) -> RoleCache:
         return RoleCache(redis)
 
+    @provide
+    def page_cache(self, redis: Redis) -> IPageCache:
+        return RedisPageCache(redis)
+
+    @provide
+    def progress_throttle(self, redis: Redis) -> IProgressThrottle:
+        return RedisProgressThrottle(redis)
+
 
 class BotProvider(Provider):
     """Bot — singleton на процесс."""
@@ -155,6 +198,16 @@ class BotProvider(Provider):
     @provide
     def notifier(self, bot: Bot) -> IAuthorNotifier:
         return AuthorNotifier(bot)
+
+
+class QueuesProvider(Provider):
+    """Адаптеры TaskIQ-очередей — app-scope, без сессии БД."""
+
+    scope = Scope.APP
+
+    @provide
+    def repagination_queue(self) -> IRepaginationQueue:
+        return TaskiqRepaginationQueue()
 
 
 class RepositoriesProvider(Provider):
@@ -209,6 +262,40 @@ class RepositoriesProvider(Provider):
     @provide
     def mod_notifier(self, bot: Bot, users: IUserRepository) -> IModeratorNotifier:
         return ModeratorNotifier(bot, users)
+
+    # ---------- reading ----------
+
+    @provide
+    def chapter_pages_repo(
+        self, session: AsyncSession
+    ) -> IChapterPagesRepository:
+        return ChapterPagesRepository(session)
+
+    @provide
+    def bookmarks_repo(self, session: AsyncSession) -> IBookmarksRepository:
+        return BookmarksRepository(session)
+
+    @provide
+    def likes_repo(self, session: AsyncSession) -> ILikesRepository:
+        return LikesRepository(session)
+
+    @provide
+    def reads_completed_repo(
+        self, session: AsyncSession
+    ) -> IReadsCompletedRepository:
+        return ReadsCompletedRepository(session)
+
+    @provide
+    def reading_progress_repo(
+        self, session: AsyncSession
+    ) -> IReadingProgressRepository:
+        return ReadingProgressRepository(session)
+
+    @provide
+    def fanfic_feed_reader(
+        self, session: AsyncSession
+    ) -> IFanficFeedReader:
+        return FanficFeedReader(session)
 
 
 class UseCasesProvider(Provider):
@@ -434,6 +521,100 @@ class UseCasesProvider(Provider):
     ) -> ReleaseStaleLocksUseCase:
         return ReleaseStaleLocksUseCase(uow, moderation, clock)
 
+    # ---------- reading ----------
+
+    @provide
+    def paginate_chapter_uc(
+        self,
+        uow: UnitOfWork,
+        chapters: IChapterRepository,
+        pages: IChapterPagesRepository,
+        page_cache: IPageCache,
+    ) -> PaginateChapterUseCase:
+        return PaginateChapterUseCase(uow, chapters, pages, page_cache)
+
+    @provide
+    def open_fanfic_uc(
+        self,
+        fanfics: IFanficRepository,
+        chapters: IChapterRepository,
+        progress: IReadingProgressRepository,
+    ) -> OpenFanficUseCase:
+        return OpenFanficUseCase(fanfics, chapters, progress)
+
+    @provide
+    def read_page_uc(
+        self,
+        fanfics: IFanficRepository,
+        chapters: IChapterRepository,
+        pages: IChapterPagesRepository,
+        page_cache: IPageCache,
+        bookmarks: IBookmarksRepository,
+        likes: ILikesRepository,
+        reads_completed: IReadsCompletedRepository,
+    ) -> ReadPageUseCase:
+        return ReadPageUseCase(
+            fanfics, chapters, pages, page_cache, bookmarks, likes, reads_completed
+        )
+
+    @provide
+    def save_progress_uc(
+        self,
+        uow: UnitOfWork,
+        progress: IReadingProgressRepository,
+        throttle: IProgressThrottle,
+        clock: Clock,
+    ) -> SaveProgressUseCase:
+        return SaveProgressUseCase(uow, progress, throttle, clock)
+
+    @provide
+    def toggle_like_uc(
+        self,
+        uow: UnitOfWork,
+        fanfics: IFanficRepository,
+        likes: ILikesRepository,
+        clock: Clock,
+    ) -> ToggleLikeUseCase:
+        return ToggleLikeUseCase(uow, fanfics, likes, clock)
+
+    @provide
+    def toggle_bookmark_uc(
+        self,
+        uow: UnitOfWork,
+        fanfics: IFanficRepository,
+        bookmarks: IBookmarksRepository,
+        clock: Clock,
+    ) -> ToggleBookmarkUseCase:
+        return ToggleBookmarkUseCase(uow, fanfics, bookmarks, clock)
+
+    @provide
+    def mark_completed_uc(
+        self,
+        uow: UnitOfWork,
+        fanfics: IFanficRepository,
+        chapters: IChapterRepository,
+        reads_completed: IReadsCompletedRepository,
+        outbox: IOutboxRepository,
+        clock: Clock,
+    ) -> MarkCompletedUseCase:
+        return MarkCompletedUseCase(
+            uow, fanfics, chapters, reads_completed, outbox, clock
+        )
+
+    @provide
+    def list_feed_uc(self, feed: IFanficFeedReader) -> ListFeedUseCase:
+        return ListFeedUseCase(feed)
+
+    @provide
+    def list_my_shelf_uc(
+        self,
+        fanfics: IFanficRepository,
+        bookmarks: IBookmarksRepository,
+        likes: ILikesRepository,
+        progress: IReadingProgressRepository,
+    ) -> ListMyShelfUseCase:
+        return ListMyShelfUseCase(fanfics, bookmarks, likes, progress)
+
 
 def build_container() -> AsyncContainer:
     """Собрать контейнер со всеми провайдерами. Вызывать один раз на процесс."""
@@ -447,6 +628,7 @@ def build_container() -> AsyncContainer:
         DatabaseProvider(),
         RedisProvider(),
         BotProvider(),
+        QueuesProvider(),
         RepositoriesProvider(),
         UseCasesProvider(),
         AiogramProvider(),

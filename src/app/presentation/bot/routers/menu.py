@@ -10,8 +10,6 @@ from app.presentation.bot.texts.ru import t
 router = Router(name="menu")
 
 
-@router.callback_query(
-    F.data.in_({"menu:browse", "menu:shelf", "menu:admin"})
-)
+@router.callback_query(F.data == "menu:admin")
 async def stub(cb: CallbackQuery) -> None:
     await cb.answer(t("not_implemented"), show_alert=True)

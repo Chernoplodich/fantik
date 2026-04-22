@@ -21,8 +21,25 @@ from app.domain.shared.types import UserId
 class TestPickNextSkipLocked:
     async def _setup_queue(self, conn) -> list[int]:
         """Создаёт пользователей, 2 фика и 2 открытых задания в БД, возвращает case_ids."""
-        await conn.execute(text("INSERT INTO users (id, timezone) VALUES (1, 'UTC') ON CONFLICT DO NOTHING"))
-        await conn.execute(text("INSERT INTO users (id, timezone) VALUES (2, 'UTC') ON CONFLICT DO NOTHING"))
+        await conn.execute(
+            text("INSERT INTO users (id, timezone) VALUES (1, 'UTC') ON CONFLICT DO NOTHING")
+        )
+        await conn.execute(
+            text("INSERT INTO users (id, timezone) VALUES (2, 'UTC') ON CONFLICT DO NOTHING")
+        )
+        # Модераторы (их id используется в pick_next → FK moderation_queue.locked_by → users).
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, timezone, role) VALUES (100, 'UTC', 'moderator') "
+                "ON CONFLICT DO NOTHING"
+            )
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO users (id, timezone, role) VALUES (200, 'UTC', 'moderator') "
+                "ON CONFLICT DO NOTHING"
+            )
+        )
 
         fandom_id = (await conn.execute(text("SELECT id FROM fandoms LIMIT 1"))).scalar_one()
         age_id = (await conn.execute(text("SELECT id FROM age_ratings LIMIT 1"))).scalar_one()

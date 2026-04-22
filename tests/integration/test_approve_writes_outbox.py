@@ -32,7 +32,16 @@ class TestApproveOutbox:
                 await setup_conn.execute(text("DELETE FROM moderation_queue WHERE TRUE"))
                 await setup_conn.execute(text("DELETE FROM fanfics WHERE TRUE"))
                 await setup_conn.execute(
-                    text("INSERT INTO users (id, timezone) VALUES (1, 'UTC') ON CONFLICT DO NOTHING")
+                    text(
+                        "INSERT INTO users (id, timezone) VALUES (1, 'UTC') ON CONFLICT DO NOTHING"
+                    )
+                )
+                # Модератор pick_next ставит locked_by = 99 → FK требует users.id=99.
+                await setup_conn.execute(
+                    text(
+                        "INSERT INTO users (id, timezone, role) "
+                        "VALUES (99, 'UTC', 'moderator') ON CONFLICT DO NOTHING"
+                    )
                 )
                 fandom_id = (
                     await setup_conn.execute(text("SELECT id FROM fandoms LIMIT 1"))
@@ -86,9 +95,7 @@ class TestApproveOutbox:
             async with engine.connect() as check_conn:
                 cnt = (
                     await check_conn.execute(
-                        text(
-                            "SELECT count(*) FROM outbox WHERE event_type='fanfic.approved'"
-                        )
+                        text("SELECT count(*) FROM outbox WHERE event_type='fanfic.approved'")
                     )
                 ).scalar_one()
                 assert cnt == 1

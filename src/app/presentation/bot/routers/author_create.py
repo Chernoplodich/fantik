@@ -34,7 +34,6 @@ from app.presentation.bot.callback_data.fanfic import (
     FandomPickCD,
     FanficCD,
 )
-from app.presentation.bot.filters.author import HasAuthorNick
 from app.presentation.bot.fsm.states.create_fanfic import CreateFanficStates
 from app.presentation.bot.keyboards.create_fanfic import (
     FANDOM_PAGE_SIZE,

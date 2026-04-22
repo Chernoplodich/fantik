@@ -115,7 +115,7 @@ fantik/
 - [x] **Этап 0** — скелет проекта (pyproject, Docker, линтеры, CI, core, DI-контейнер)
 - [x] **Этап 1** — users + tracking + онбординг (`/start`, согласие с правилами, установка `author_nick`, `/admin`/`/mod` роли через seed)
 - [x] **Этап 2** — авторство + модерация (создание/правка фика, главы, submit/cancel/revise, очередь SKIP LOCKED, approve/reject с 7 причинами, audit_log, outbox, уведомления автору)
-- [ ] Этап 3 — читалка + пагинатор
+- [x] **Этап 3** — читалка + пагинатор (`ChapterPaginator` с UTF-16 split + свойствами hypothesis, таблицы `bookmarks` / `likes` / `reads_completed` / `reading_progress`, Redis-кэш страниц на msgpack, TaskIQ `repaginate_chapter` + минимальный outbox-диспетчер на `fanfic.approved`, роутеры `reader` / `browse` / `shelf`, каталог «Новое»/«Топ»/«По фэндому», атомарные счётчики `fanfics.likes_count` и `fanfics.reads_completed_count`)
 - [ ] Этап 4 — поиск + каталог
 - [ ] Этап 5 — социалка (подписки, жалобы)
 - [ ] Этап 6 — админские инструменты (рассылки, статистика)

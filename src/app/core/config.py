@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, computed_field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class AppEnv(StrEnum):
@@ -50,7 +50,9 @@ class Settings(BaseSettings):
 
     # ---------- telegram ----------
     bot_token: SecretStr
-    admin_tg_ids: list[int] = Field(default_factory=list)
+    # NoDecode: не даём pydantic-settings парсить как JSON — обрабатываем в
+    # валидаторе ниже (поддержка "1,2,3"-формата env-строки).
+    admin_tg_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
     bot_run_mode: RunMode = RunMode.POLLING
 
     webhook_base_url: str = ""
@@ -167,12 +169,10 @@ class Settings(BaseSettings):
         if not self.webhook_base_url:
             return ""
         token_hash = hashlib.sha256(self.bot_token.get_secret_value().encode()).hexdigest()[:32]
-        return (
-            f"{self.webhook_base_url.rstrip('/')}{self.webhook_path.rstrip('/')}/{token_hash}"
-        )
+        return f"{self.webhook_base_url.rstrip('/')}{self.webhook_path.rstrip('/')}/{token_hash}"
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Кэшированный singleton. Использовать из main-процессов и DI-провайдеров."""
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

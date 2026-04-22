@@ -3,15 +3,19 @@
 from app.infrastructure.db.base import Base  # noqa: F401
 from app.infrastructure.db.models.age_rating import AgeRating  # noqa: F401
 from app.infrastructure.db.models.audit_log import AuditLog  # noqa: F401
+from app.infrastructure.db.models.bookmark import Bookmark  # noqa: F401
 from app.infrastructure.db.models.chapter import Chapter  # noqa: F401
 from app.infrastructure.db.models.chapter_page import ChapterPage  # noqa: F401
 from app.infrastructure.db.models.fandom import Fandom  # noqa: F401
 from app.infrastructure.db.models.fanfic import Fanfic  # noqa: F401
 from app.infrastructure.db.models.fanfic_tag import FanficTag  # noqa: F401
 from app.infrastructure.db.models.fanfic_version import FanficVersion  # noqa: F401
+from app.infrastructure.db.models.like import Like  # noqa: F401
 from app.infrastructure.db.models.moderation_queue import ModerationQueue  # noqa: F401
 from app.infrastructure.db.models.moderation_reason import ModerationReason  # noqa: F401
 from app.infrastructure.db.models.outbox import Outbox  # noqa: F401
+from app.infrastructure.db.models.read_completed import ReadCompleted  # noqa: F401
+from app.infrastructure.db.models.reading_progress import ReadingProgress  # noqa: F401
 from app.infrastructure.db.models.tag import Tag  # noqa: F401
 from app.infrastructure.db.models.tracking import (  # noqa: F401
     TrackingCode,
@@ -23,15 +27,19 @@ __all__ = [
     "AgeRating",
     "AuditLog",
     "Base",
+    "Bookmark",
     "Chapter",
     "ChapterPage",
     "Fandom",
     "Fanfic",
     "FanficTag",
     "FanficVersion",
+    "Like",
     "ModerationQueue",
     "ModerationReason",
     "Outbox",
+    "ReadCompleted",
+    "ReadingProgress",
     "Tag",
     "TrackingCode",
     "TrackingEvent",

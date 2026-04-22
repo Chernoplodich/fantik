@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.fanfics.ports import (
@@ -112,3 +112,30 @@ class FanficRepository(IFanficRepository):
         )
         result = await self._s.execute(stmt, {"author_id": int(author_id), "tz": tz})
         return int(result.scalar_one())
+
+    async def increment_likes(self, fic_id: FanficId) -> None:
+        stmt = (
+            update(FanficModel)
+            .where(FanficModel.id == int(fic_id))
+            .values(likes_count=FanficModel.likes_count + 1)
+        )
+        await self._s.execute(stmt)
+        await self._s.flush()
+
+    async def decrement_likes(self, fic_id: FanficId) -> None:
+        stmt = (
+            update(FanficModel)
+            .where(FanficModel.id == int(fic_id), FanficModel.likes_count > 0)
+            .values(likes_count=FanficModel.likes_count - 1)
+        )
+        await self._s.execute(stmt)
+        await self._s.flush()
+
+    async def increment_reads_completed(self, fic_id: FanficId) -> None:
+        stmt = (
+            update(FanficModel)
+            .where(FanficModel.id == int(fic_id))
+            .values(reads_completed_count=FanficModel.reads_completed_count + 1)
+        )
+        await self._s.execute(stmt)
+        await self._s.flush()
