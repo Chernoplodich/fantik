@@ -8,7 +8,6 @@ import pytest
 
 from app.core.config import Settings
 
-
 _DEFAULT_ENV = {
     "BOT_TOKEN": "111:FAKE_TOKEN_FOR_TESTS_THAT_IS_LONG_ENOUGH",
     "POSTGRES_PASSWORD": "pw",

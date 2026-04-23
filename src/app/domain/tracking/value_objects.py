@@ -27,7 +27,7 @@ class TrackingCodeStr(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "TrackingCodeStr":
+    def __new__(cls, value: str) -> TrackingCodeStr:
         if not isinstance(value, str):
             raise ValidationError("tracking code must be a string")
         if not _CODE_RE.fullmatch(value):

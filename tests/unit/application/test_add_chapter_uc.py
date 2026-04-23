@@ -101,7 +101,6 @@ class TestAddChapter:
         fic_id, _, fanfics, chapters, _, settings = await self._make_fic(clock)
 
         # подменим settings.max_chapters_per_fic → 2 для скорости
-        from dataclasses import replace
 
         class S:
             max_chapters_per_fic = 2

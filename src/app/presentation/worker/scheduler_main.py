@@ -11,12 +11,15 @@ import sys
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
-from app.infrastructure.tasks.broker import scheduler  # noqa: F401 (re-exported for CLI)
 
 # Регистрация задач с `schedule=[...]` — LabelScheduleSource читает их.
-from app.infrastructure.tasks import indexing  # noqa: F401
-from app.infrastructure.tasks import outbox_dispatcher  # noqa: F401
-from app.infrastructure.tasks import repagination  # noqa: F401
+from app.infrastructure.tasks import (
+    broadcast_scheduler,  # noqa: F401
+    indexing,  # noqa: F401
+    outbox_dispatcher,  # noqa: F401
+    repagination,  # noqa: F401
+)
+from app.infrastructure.tasks.broker import scheduler  # noqa: F401 (re-exported for CLI)
 
 
 def _run() -> None:

@@ -49,7 +49,7 @@ class FanficTitle(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "FanficTitle":
+    def __new__(cls, value: str) -> FanficTitle:
         if not isinstance(value, str):
             raise ValidationError("title must be a string")
         cleaned = " ".join(value.split())
@@ -63,7 +63,7 @@ class Summary(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "Summary":
+    def __new__(cls, value: str) -> Summary:
         if not isinstance(value, str):
             raise ValidationError("summary must be a string")
         cleaned = value.strip()
@@ -77,7 +77,7 @@ class ChapterTitle(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "ChapterTitle":
+    def __new__(cls, value: str) -> ChapterTitle:
         if not isinstance(value, str):
             raise ValidationError("chapter title must be a string")
         cleaned = " ".join(value.split())
@@ -93,7 +93,7 @@ class ChapterNumber(int):
 
     __slots__ = ()
 
-    def __new__(cls, value: int) -> "ChapterNumber":
+    def __new__(cls, value: int) -> ChapterNumber:
         iv = int(value)
         if not (CHAPTER_NUMBER_MIN <= iv <= CHAPTER_NUMBER_MAX):
             raise ValidationError(
@@ -111,7 +111,7 @@ class TagName(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "TagName":
+    def __new__(cls, value: str) -> TagName:
         if not isinstance(value, str):
             raise ValidationError("tag name must be a string")
         cleaned = " ".join(value.split())
@@ -125,7 +125,7 @@ class TagSlug(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "TagSlug":
+    def __new__(cls, value: str) -> TagSlug:
         if not isinstance(value, str):
             raise ValidationError("tag slug must be a string")
         if not value or len(value) > TAG_SLUG_MAX:
@@ -142,7 +142,7 @@ class AgeRatingCode(str):
 
     _RE = re.compile(r"^[A-Z][A-Z0-9\-]{0,7}$")
 
-    def __new__(cls, value: str) -> "AgeRatingCode":
+    def __new__(cls, value: str) -> AgeRatingCode:
         if not isinstance(value, str):
             raise ValidationError("age_rating code must be a string")
         cleaned = value.strip().upper()

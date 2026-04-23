@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.application.moderation.ports import IAuditLog
 from app.application.shared.ports import UnitOfWork
 from app.application.tracking.ports import ITrackingRepository
 from app.core.clock import Clock
@@ -27,9 +28,16 @@ class CreateTrackingCodeResult:
 
 
 class CreateTrackingCodeUseCase:
-    def __init__(self, uow: UnitOfWork, tracking: ITrackingRepository, clock: Clock) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        tracking: ITrackingRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> None:
         self._uow = uow
         self._tracking = tracking
+        self._audit = audit
         self._clock = clock
 
     async def __call__(self, cmd: CreateTrackingCodeCommand) -> CreateTrackingCodeResult:
@@ -45,6 +53,7 @@ class CreateTrackingCodeUseCase:
             else:  # pragma: no cover — почти невероятно
                 raise RuntimeError("Не удалось сгенерировать уникальный код")
 
+        now = self._clock.now()
         entity = TrackingCode(
             id=None,
             code=code_str,
@@ -52,10 +61,19 @@ class CreateTrackingCodeUseCase:
             description=cmd.description,
             created_by=UserId(cmd.created_by),
             active=True,
-            created_at=self._clock.now(),
+            created_at=now,
         )
         async with self._uow:
             saved = await self._tracking.save_code(entity)
+            assert saved.id is not None
+            await self._audit.log(
+                actor_id=UserId(int(cmd.created_by)),
+                action="tracking.create",
+                target_type="tracking_code",
+                target_id=int(saved.id),
+                payload={"code": str(saved.code), "name": cmd.name},
+                now=now,
+            )
             await self._uow.commit()
         assert saved.id is not None
         return CreateTrackingCodeResult(code=str(saved.code), id=int(saved.id))

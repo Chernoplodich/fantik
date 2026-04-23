@@ -39,8 +39,8 @@ from app.application.subscriptions.unsubscribe import (
 from app.core.clock import FrozenClock
 from app.domain.fanfics.entities import Fanfic
 from app.domain.fanfics.value_objects import (
-    FicStatus,
     FanficTitle,
+    FicStatus,
     Summary,
 )
 from app.domain.reports.entities import Report

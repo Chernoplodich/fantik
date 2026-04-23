@@ -26,7 +26,6 @@ from aiogram.exceptions import (
     TelegramRetryAfter,
 )
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from redis.asyncio import Redis
 
 from app.application.reports.ports import IReportRepository
 from app.application.shared.ports import UnitOfWork

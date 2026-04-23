@@ -4,6 +4,7 @@ from app.infrastructure.db.base import Base
 from app.infrastructure.db.models.age_rating import AgeRating
 from app.infrastructure.db.models.audit_log import AuditLog
 from app.infrastructure.db.models.bookmark import Bookmark
+from app.infrastructure.db.models.broadcast import Broadcast, BroadcastDelivery
 from app.infrastructure.db.models.chapter import Chapter
 from app.infrastructure.db.models.chapter_page import ChapterPage
 from app.infrastructure.db.models.fandom import Fandom
@@ -31,6 +32,8 @@ __all__ = [
     "AuditLog",
     "Base",
     "Bookmark",
+    "Broadcast",
+    "BroadcastDelivery",
     "Chapter",
     "ChapterPage",
     "Fandom",

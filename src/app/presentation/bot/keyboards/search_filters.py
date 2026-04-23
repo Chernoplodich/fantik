@@ -17,7 +17,6 @@ from app.presentation.bot.callback_data.browse import BrowseCD
 from app.presentation.bot.callback_data.reader import ReadNav
 from app.presentation.bot.callback_data.search import SearchCD
 
-
 _NOOP = "noop"
 
 SORT_LABELS: dict[str, str] = {

@@ -12,14 +12,17 @@ import sys
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
-from app.infrastructure.tasks.broker import broker  # noqa: F401 (re-exported for CLI)
 
 # Регистрация задач: при импорте этих модулей их `@broker.task`-декораторы
 # добавляют таски в broker.tasks.
-from app.infrastructure.tasks import indexing  # noqa: F401
-from app.infrastructure.tasks import notifications  # noqa: F401
-from app.infrastructure.tasks import outbox_dispatcher  # noqa: F401
-from app.infrastructure.tasks import repagination  # noqa: F401
+from app.infrastructure.tasks import (
+    broadcast_scheduler,  # noqa: F401
+    indexing,  # noqa: F401
+    notifications,  # noqa: F401
+    outbox_dispatcher,  # noqa: F401
+    repagination,  # noqa: F401
+)
+from app.infrastructure.tasks.broker import broker  # noqa: F401 (re-exported for CLI)
 
 
 def _run() -> None:
@@ -38,6 +41,7 @@ def _run() -> None:
             "app.infrastructure.tasks.indexing",
             "app.infrastructure.tasks.notifications",
             "app.infrastructure.tasks.outbox_dispatcher",
+            "app.infrastructure.tasks.broadcast_scheduler",
             "--log-level",
             get_settings().log_level,
         ],

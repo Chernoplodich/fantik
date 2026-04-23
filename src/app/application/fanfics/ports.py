@@ -24,7 +24,6 @@ from app.domain.shared.types import (
     UserId,
 )
 
-
 # ---------- DTO / read-models ----------
 
 

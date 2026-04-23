@@ -15,7 +15,6 @@ from app.domain.fanfics.services.paginator import (
 )
 from app.domain.shared.utf16 import char_to_utf16, utf16_length
 
-
 # ---------- hypothesis-стратегии ----------
 
 

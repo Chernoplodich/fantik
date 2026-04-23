@@ -29,11 +29,13 @@ from app.presentation.bot.keyboards.browse import (
 from app.presentation.bot.keyboards.reader import feed_kb
 from app.presentation.bot.keyboards.search_filters import (
     age_rating_picker_kb,
-    fandom_picker_kb as search_fandom_picker_kb,
     filters_root_kb,
     results_kb,
     sort_picker_kb,
     tag_picker_kb,
+)
+from app.presentation.bot.keyboards.search_filters import (
+    fandom_picker_kb as search_fandom_picker_kb,
 )
 
 log = get_logger(__name__)

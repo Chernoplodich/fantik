@@ -51,7 +51,7 @@ class EntityDict:
         return {"type": self.type, "offset": self.offset, "length": self.length, **self.extra}
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "EntityDict":
+    def from_dict(cls, d: dict[str, Any]) -> EntityDict:
         extra = {k: v for k, v in d.items() if k not in {"type", "offset", "length"}}
         return cls(type=d["type"], offset=int(d["offset"]), length=int(d["length"]), extra=extra)
 

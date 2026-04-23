@@ -82,18 +82,20 @@ class RegisterUserUseCase:
 
             await self._users.save(user)
 
-            # tracking: 'start' всегда
-            await self._tracking.record(
-                TrackingEvent(
-                    id=None,
-                    code_id=code_id,
-                    user_id=user.id,
-                    event_type=TrackingEventType.START,
-                    payload={},
-                    created_at=now,
-                )
-            )
+            # tracking: пишем события ТОЛЬКО для новых пользователей, чтобы
+            # трекинговая ссылка не раздувала переходы за счёт повторных
+            # нажатий /start от уже зарегистрированных юзеров.
             if is_new:
+                await self._tracking.record(
+                    TrackingEvent(
+                        id=None,
+                        code_id=code_id,
+                        user_id=user.id,
+                        event_type=TrackingEventType.START,
+                        payload={},
+                        created_at=now,
+                    )
+                )
                 await self._tracking.record(
                     TrackingEvent(
                         id=None,

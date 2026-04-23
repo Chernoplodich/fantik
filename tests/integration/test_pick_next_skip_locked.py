@@ -9,8 +9,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.infrastructure.db.repositories.moderation import ModerationRepository
 from app.domain.shared.types import UserId
+from app.infrastructure.db.repositories.moderation import ModerationRepository
 
 
 @pytest.mark.integration

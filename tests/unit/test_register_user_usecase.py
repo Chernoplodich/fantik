@@ -23,7 +23,6 @@ from app.domain.tracking.value_objects import TrackingCodeStr
 from app.domain.users.entities import User
 from app.domain.users.events import UserRegistered
 
-
 # ---------- фейковые зависимости ----------
 
 
@@ -184,8 +183,10 @@ class TestRegisterUser:
         )
 
         assert result.is_new is False
+        # Повторный /start существующего юзера не пишет tracking-событий
+        # (иначе UTM-ссылка раздувается за счёт уже зарегистрированных).
         types = [e.event_type.value for e in tracking.events]
-        assert types == ["start"]  # только start, без register
+        assert types == []
 
     async def test_new_user_with_valid_utm(self, clock: FrozenClock) -> None:
         users, tracking, uow = FakeUsers(), FakeTracking(), FakeUow()

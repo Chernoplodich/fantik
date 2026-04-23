@@ -21,7 +21,6 @@ from app.domain.shared.types import (
 from app.infrastructure.db.models.chapter import Chapter as ChapterModel
 from app.infrastructure.db.models.fanfic import Fanfic as FanficModel
 
-
 # ---------- Fanfic ----------
 
 

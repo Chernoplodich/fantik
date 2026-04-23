@@ -16,7 +16,6 @@ from app.presentation.bot.callback_data.fanfic import (
 )
 from app.presentation.bot.callback_data.reader import ReadNav
 
-
 STATUS_LABELS = {
     FicStatus.DRAFT: "✏️",
     FicStatus.PENDING: "⏳",

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.domain.reports.value_objects import ReportTarget
-from app.domain.shared.types import ReportId, UserId
+from app.domain.shared.types import UserId
 from app.infrastructure.db.repositories.notifications import NotificationRepository
 from app.infrastructure.db.repositories.reports import ReportRepository
 from app.infrastructure.db.repositories.subscriptions import SubscriptionRepository

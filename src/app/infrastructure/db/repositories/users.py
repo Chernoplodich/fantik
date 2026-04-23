@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from datetime import UTC, datetime
+
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.users.ports import IUserRepository
@@ -65,3 +67,21 @@ class UserRepository(IUserRepository):
         )
         rows = (await self._s.execute(stmt)).scalars().all()
         return [UserId(r) for r in rows]
+
+    async def mark_bot_blocked(self, user_id: UserId) -> None:
+        await self._s.execute(
+            text(
+                "UPDATE users SET blocked_bot_at = :now "
+                "WHERE id = :uid AND blocked_bot_at IS NULL"
+            ),
+            {"now": datetime.now(UTC), "uid": int(user_id)},
+        )
+
+    async def clear_bot_blocked(self, user_id: UserId) -> None:
+        await self._s.execute(
+            text(
+                "UPDATE users SET blocked_bot_at = NULL "
+                "WHERE id = :uid AND blocked_bot_at IS NOT NULL"
+            ),
+            {"uid": int(user_id)},
+        )

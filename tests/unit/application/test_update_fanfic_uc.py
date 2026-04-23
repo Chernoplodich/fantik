@@ -17,7 +17,7 @@ from app.application.fanfics.update_fanfic import (
 from app.core.clock import FrozenClock
 from app.core.errors import NotFoundError, ValidationError
 from app.domain.fanfics.exceptions import ForbiddenActionError, WrongStatusError
-from app.domain.fanfics.value_objects import FicStatus, TITLE_MAX
+from app.domain.fanfics.value_objects import TITLE_MAX, FicStatus
 from app.domain.shared.types import FanficId
 
 from ._fakes import (

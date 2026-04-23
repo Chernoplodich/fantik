@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from dishka.integrations.aiogram import FromDishka, inject
-
-from aiogram.exceptions import TelegramBadRequest
 
 from app.application.fanfics.ports import (
     IChapterRepository,
@@ -20,11 +19,11 @@ from app.application.fanfics.ports import (
 )
 from app.application.moderation.approve import ApproveCommand, ApproveUseCase
 from app.application.moderation.list_reasons import ListReasonsUseCase
-from app.application.moderation.ports import IModerationRepository
 from app.application.moderation.pick_next import (
     PickNextCommand,
     PickNextUseCase,
 )
+from app.application.moderation.ports import IModerationRepository
 from app.application.moderation.reject import RejectCommand, RejectUseCase
 from app.application.moderation.release_stale_locks import (
     ReleaseStaleLocksUseCase,

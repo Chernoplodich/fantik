@@ -22,8 +22,14 @@ from app.presentation.bot.middlewares.logging import LoggingMiddleware
 from app.presentation.bot.middlewares.role import RoleMiddleware
 from app.presentation.bot.middlewares.throttle import ThrottleMiddleware
 from app.presentation.bot.middlewares.user_upsert import UserUpsertMiddleware
+from app.presentation.bot.routers import admin_broadcast as admin_broadcast_router
+from app.presentation.bot.routers import admin_fandoms as admin_fandoms_router
+from app.presentation.bot.routers import admin_stats as admin_stats_router
+from app.presentation.bot.routers import admin_tags as admin_tags_router
+from app.presentation.bot.routers import admin_tracking as admin_tracking_router
 from app.presentation.bot.routers import author_create as author_create_router
 from app.presentation.bot.routers import author_manage as author_manage_router
+from app.presentation.bot.routers import bot_status as bot_status_router
 from app.presentation.bot.routers import browse as browse_router
 from app.presentation.bot.routers import errors as errors_router
 from app.presentation.bot.routers import inline_search as inline_search_router
@@ -51,6 +57,9 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     # Middleware регистрируются позже (после setup_dishka), чтобы они стояли
     # ПОСЛЕ ContainerMiddleware — иначе data[CONTAINER_NAME] отсутствует.
     dp.include_router(errors_router.router)
+    # my_chat_member (block/unblock бота) — ранний роутер, не блокируется ban_check
+    # для kicked-юзера, т.к. обрабатывает его как отдельный апдейт.
+    dp.include_router(bot_status_router.router)
     dp.include_router(start_router.router)
     dp.include_router(onboarding_router.router)
     dp.include_router(profile_router.router)
@@ -63,6 +72,13 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     dp.include_router(reports_router.router)
     dp.include_router(shelf_router.router)
     dp.include_router(inline_search_router.router)
+    # Admin routers — должны быть ДО menu_router (иначе `menu:admin` callback
+    # перехватывается менюшкой без аргументов).
+    dp.include_router(admin_broadcast_router.router)
+    dp.include_router(admin_tracking_router.router)
+    dp.include_router(admin_stats_router.router)
+    dp.include_router(admin_fandoms_router.router)
+    dp.include_router(admin_tags_router.router)
     dp.include_router(menu_router.router)
     return dp
 

@@ -7,10 +7,8 @@ import re
 from aiogram import Router, html
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka, inject
-
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.application.users.register_user import RegisterUserCommand, RegisterUserUseCase
 from app.core.logging import get_logger

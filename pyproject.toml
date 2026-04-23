@@ -33,6 +33,8 @@ dependencies = [
     "sentry-sdk[asyncio]>=2.10",
     # HTTP (webhook + health)
     "aiohttp>=3.10",
+    # Charts (admin stats dashboards)
+    "matplotlib>=3.9",
     # Misc
     "orjson>=3.10",
     "msgpack>=1.0",

@@ -45,6 +45,9 @@ class User(Base):
     agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     banned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     banned_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    blocked_bot_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

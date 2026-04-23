@@ -23,7 +23,7 @@ from app.application.moderation.reject import RejectCommand, RejectUseCase
 from app.core.clock import FrozenClock
 from app.core.config import get_settings
 from app.domain.fanfics.value_objects import FicStatus
-from app.domain.shared.types import FanficId, ModerationReasonId, UserId
+from app.domain.shared.types import FanficId, UserId
 
 from ._fakes import (
     FakeAudit,

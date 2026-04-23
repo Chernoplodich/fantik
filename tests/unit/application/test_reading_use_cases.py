@@ -48,7 +48,6 @@ from tests.unit.application._reading_fakes import (
     FakeChapterPages,
     FakeLikes,
     FakePageCache,
-    FakeProgressThrottle,
     FakeReadingProgress,
     FakeReadsCompleted,
     extend_with_counters,

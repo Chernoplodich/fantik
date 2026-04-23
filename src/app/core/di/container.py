@@ -10,6 +10,28 @@ from meilisearch_python_sdk import AsyncClient as MeiliAsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from app.application.broadcasts.cancel import CancelBroadcastUseCase
+from app.application.broadcasts.create_draft import CreateBroadcastDraftUseCase
+from app.application.broadcasts.deliver_one import DeliverOneUseCase
+from app.application.broadcasts.enumerate_recipients import (
+    EnumerateRecipientsUseCase,
+)
+from app.application.broadcasts.finalize import FinalizeBroadcastUseCase
+from app.application.broadcasts.launch import LaunchBroadcastUseCase
+from app.application.broadcasts.list_broadcasts import (
+    GetBroadcastCardUseCase,
+    ListMyBroadcastsUseCase,
+)
+from app.application.broadcasts.ports import (
+    IBroadcastBot,
+    IBroadcastQueue,
+    IBroadcastRepository,
+    IDeliveryRepository,
+    IUserSegmentReader,
+)
+from app.application.broadcasts.schedule import ScheduleBroadcastUseCase
+from app.application.broadcasts.set_keyboard import SetKeyboardUseCase
+from app.application.broadcasts.set_segment import SetSegmentUseCase
 from app.application.fanfics.add_chapter import AddChapterUseCase
 from app.application.fanfics.cancel_submission import CancelSubmissionUseCase
 from app.application.fanfics.create_draft import CreateDraftUseCase
@@ -63,6 +85,24 @@ from app.application.reading.read_page import ReadPageUseCase
 from app.application.reading.save_progress import SaveProgressUseCase
 from app.application.reading.toggle_bookmark import ToggleBookmarkUseCase
 from app.application.reading.toggle_like import ToggleLikeUseCase
+from app.application.reference.fandoms_crud import (
+    CreateFandomUseCase,
+    ListFandomsAdminUseCase,
+    UpdateFandomUseCase,
+)
+from app.application.reference.ports import (
+    IFandomAdminRepository,
+    ITagAdminRepository,
+    ITagCandidatesReader,
+)
+from app.application.reference.tags_merge import (
+    ListMergeCandidatesUseCase,
+    MergeTagsUseCase,
+)
+from app.application.reports.create_report import CreateReportUseCase
+from app.application.reports.handle_report import HandleReportUseCase
+from app.application.reports.list_open_reports import ListOpenReportsUseCase
+from app.application.reports.ports import IReportRepository
 from app.application.search.index_fanfic import IndexFanficUseCase
 from app.application.search.ports import (
     ISearchCache,
@@ -72,12 +112,11 @@ from app.application.search.ports import (
     ISearchIndexQueue,
     ISuggestReader,
 )
-from app.application.reports.create_report import CreateReportUseCase
-from app.application.reports.handle_report import HandleReportUseCase
-from app.application.reports.list_open_reports import ListOpenReportsUseCase
-from app.application.reports.ports import IReportRepository
 from app.application.search.search import SearchUseCase
 from app.application.search.suggest import SuggestUseCase
+from app.application.stats.get_dashboard import GetDashboardUseCase
+from app.application.stats.get_funnel import GetFunnelUseCase
+from app.application.stats.ports import IStatsReader
 from app.application.subscriptions.notify_subscribers import (
     NotifySubscribersUseCase,
 )
@@ -88,6 +127,11 @@ from app.application.subscriptions.ports import (
 )
 from app.application.subscriptions.subscribe import SubscribeUseCase
 from app.application.subscriptions.unsubscribe import UnsubscribeUseCase
+from app.application.tracking.create_code import CreateTrackingCodeUseCase
+from app.application.tracking.deactivate_code import (
+    DeactivateTrackingCodeUseCase,
+)
+from app.application.tracking.list_codes import ListTrackingCodesUseCase
 from app.application.tracking.ports import ITrackingRepository
 from app.application.tracking.record_event import RecordEventUseCase
 from app.application.users.agree_to_rules import AgreeToRulesUseCase
@@ -99,10 +143,17 @@ from app.core.config import Settings, get_settings
 from app.infrastructure.db.engine import build_engine, build_sessionmaker
 from app.infrastructure.db.repositories.audit_log import AuditLogRepository
 from app.infrastructure.db.repositories.bookmarks import BookmarksRepository
+from app.infrastructure.db.repositories.broadcasts import (
+    BroadcastRepository,
+    DeliveryRepository,
+)
 from app.infrastructure.db.repositories.chapter_pages import (
     ChapterPagesRepository,
 )
 from app.infrastructure.db.repositories.chapters import ChapterRepository
+from app.infrastructure.db.repositories.fandoms_admin import (
+    PgFandomAdminRepository,
+)
 from app.infrastructure.db.repositories.fanfic_feed import FanficFeedReader
 from app.infrastructure.db.repositories.fanfic_versions import (
     FanficVersionRepository,
@@ -123,28 +174,37 @@ from app.infrastructure.db.repositories.reads_completed import (
 )
 from app.infrastructure.db.repositories.reference import ReferenceReader
 from app.infrastructure.db.repositories.reports import ReportRepository
+from app.infrastructure.db.repositories.stats import PgStatsReader
 from app.infrastructure.db.repositories.subscriptions import (
     SubscriptionRepository,
 )
 from app.infrastructure.db.repositories.tags import TagRepository
+from app.infrastructure.db.repositories.tags_admin import (
+    PgTagAdminRepository,
+    PgTagCandidatesReader,
+)
 from app.infrastructure.db.repositories.tracking import TrackingRepository
+from app.infrastructure.db.repositories.user_segment import PgUserSegmentReader
 from app.infrastructure.db.repositories.users import UserRepository
 from app.infrastructure.db.unit_of_work import SqlAlchemyUnitOfWork, UnitOfWork
+from app.infrastructure.redis.broadcast_flood_lock import BroadcastFloodLock
 from app.infrastructure.redis.page_cache import RedisPageCache
 from app.infrastructure.redis.pool import build_redis_cache_pool
 from app.infrastructure.redis.progress_throttle import RedisProgressThrottle
 from app.infrastructure.redis.role_cache import RoleCache
 from app.infrastructure.redis.search_cache import RedisSearchCache
+from app.infrastructure.redis.token_bucket import TokenBucket
 from app.infrastructure.search.client import build_meili_client
 from app.infrastructure.search.document_builder import PgSearchDocSource
 from app.infrastructure.search.fallback_pg import PgFtsSearch
 from app.infrastructure.search.indexer import MeiliSearchIndex
 from app.infrastructure.search.suggest_repo import PgSuggestReader
-from app.infrastructure.redis.token_bucket import TokenBucket
+from app.infrastructure.tasks.broadcast_queue import TaskiqBroadcastQueue
 from app.infrastructure.tasks.notification_queue import TaskiqNotificationQueue
 from app.infrastructure.tasks.repagination_queue import TaskiqRepaginationQueue
 from app.infrastructure.tasks.search_index_queue import TaskiqSearchIndexQueue
 from app.infrastructure.telegram.bot_factory import build_bot
+from app.infrastructure.telegram.copy_message import AiogramBroadcastBot
 from app.infrastructure.telegram.mod_notifier import ModeratorNotifier
 from app.infrastructure.telegram.notifier import AuthorNotifier
 
@@ -241,6 +301,16 @@ class BotProvider(Provider):
     def notifier(self, bot: Bot) -> IAuthorNotifier:
         return AuthorNotifier(bot)
 
+    @provide
+    def broadcast_flood_lock(self, redis: Redis) -> BroadcastFloodLock:
+        return BroadcastFloodLock(redis)
+
+    @provide
+    def broadcast_bot(
+        self, bot: Bot, flood_lock: BroadcastFloodLock
+    ) -> IBroadcastBot:
+        return AiogramBroadcastBot(bot, flood_lock)
+
 
 class QueuesProvider(Provider):
     """Адаптеры TaskIQ-очередей — app-scope, без сессии БД."""
@@ -258,6 +328,10 @@ class QueuesProvider(Provider):
     @provide
     def notification_queue(self) -> INotificationQueue:
         return TaskiqNotificationQueue()
+
+    @provide
+    def broadcast_queue(self) -> IBroadcastQueue:
+        return TaskiqBroadcastQueue()
 
     @provide
     def token_bucket(self, redis: Redis) -> TokenBucket:
@@ -384,6 +458,40 @@ class RepositoriesProvider(Provider):
     @provide
     def report_repo(self, session: AsyncSession) -> IReportRepository:
         return ReportRepository(session)
+
+    # ---------- broadcasts ----------
+
+    @provide
+    def broadcast_repo(self, session: AsyncSession) -> IBroadcastRepository:
+        return BroadcastRepository(session)
+
+    @provide
+    def delivery_repo(self, session: AsyncSession) -> IDeliveryRepository:
+        return DeliveryRepository(session)
+
+    @provide
+    def user_segment_reader(self, session: AsyncSession) -> IUserSegmentReader:
+        return PgUserSegmentReader(session)
+
+    # ---------- stats ----------
+
+    @provide
+    def stats_reader(self, session: AsyncSession) -> IStatsReader:
+        return PgStatsReader(session)
+
+    # ---------- reference admin ----------
+
+    @provide
+    def fandom_admin_repo(self, session: AsyncSession) -> IFandomAdminRepository:
+        return PgFandomAdminRepository(session)
+
+    @provide
+    def tag_admin_repo(self, session: AsyncSession) -> ITagAdminRepository:
+        return PgTagAdminRepository(session)
+
+    @provide
+    def tag_candidates_reader(self, session: AsyncSession) -> ITagCandidatesReader:
+        return PgTagCandidatesReader(session)
 
     # ---------- search ----------
 
@@ -793,6 +901,205 @@ class UseCasesProvider(Provider):
     @provide
     def list_open_reports_uc(self, reports: IReportRepository) -> ListOpenReportsUseCase:
         return ListOpenReportsUseCase(reports)
+
+    # ---------- broadcasts ----------
+
+    @provide
+    def create_broadcast_draft_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> CreateBroadcastDraftUseCase:
+        return CreateBroadcastDraftUseCase(uow, broadcasts, outbox, audit, clock)
+
+    @provide
+    def set_keyboard_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+    ) -> SetKeyboardUseCase:
+        return SetKeyboardUseCase(uow, broadcasts)
+
+    @provide
+    def set_segment_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+    ) -> SetSegmentUseCase:
+        return SetSegmentUseCase(uow, broadcasts)
+
+    @provide
+    def schedule_broadcast_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> ScheduleBroadcastUseCase:
+        return ScheduleBroadcastUseCase(uow, broadcasts, outbox, audit, clock)
+
+    @provide
+    def launch_broadcast_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        queue: IBroadcastQueue,
+        clock: Clock,
+    ) -> LaunchBroadcastUseCase:
+        return LaunchBroadcastUseCase(uow, broadcasts, outbox, audit, queue, clock)
+
+    @provide
+    def cancel_broadcast_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> CancelBroadcastUseCase:
+        return CancelBroadcastUseCase(uow, broadcasts, outbox, audit, clock)
+
+    @provide
+    def enumerate_recipients_uc(
+        self,
+        broadcasts: IBroadcastRepository,
+        deliveries: IDeliveryRepository,
+        segments: IUserSegmentReader,
+    ) -> EnumerateRecipientsUseCase:
+        return EnumerateRecipientsUseCase(broadcasts, deliveries, segments)
+
+    @provide
+    def deliver_one_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        deliveries: IDeliveryRepository,
+        users: IUserRepository,
+        bot: IBroadcastBot,
+        bucket: TokenBucket,
+        settings: Settings,
+        clock: Clock,
+    ) -> DeliverOneUseCase:
+        return DeliverOneUseCase(
+            uow, broadcasts, deliveries, users, bot, bucket, settings, clock
+        )
+
+    @provide
+    def finalize_broadcast_uc(
+        self,
+        uow: UnitOfWork,
+        broadcasts: IBroadcastRepository,
+        deliveries: IDeliveryRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        bot: IBroadcastBot,
+        clock: Clock,
+    ) -> FinalizeBroadcastUseCase:
+        return FinalizeBroadcastUseCase(
+            uow, broadcasts, deliveries, outbox, audit, bot, clock
+        )
+
+    @provide
+    def list_my_broadcasts_uc(
+        self, broadcasts: IBroadcastRepository
+    ) -> ListMyBroadcastsUseCase:
+        return ListMyBroadcastsUseCase(broadcasts)
+
+    @provide
+    def get_broadcast_card_uc(
+        self,
+        broadcasts: IBroadcastRepository,
+        deliveries: IDeliveryRepository,
+    ) -> GetBroadcastCardUseCase:
+        return GetBroadcastCardUseCase(broadcasts, deliveries)
+
+    # ---------- tracking admin ----------
+
+    @provide
+    def create_tracking_code_uc(
+        self,
+        uow: UnitOfWork,
+        tracking: ITrackingRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> CreateTrackingCodeUseCase:
+        return CreateTrackingCodeUseCase(uow, tracking, audit, clock)
+
+    @provide
+    def list_tracking_codes_uc(
+        self, tracking: ITrackingRepository
+    ) -> ListTrackingCodesUseCase:
+        return ListTrackingCodesUseCase(tracking)
+
+    @provide
+    def deactivate_tracking_code_uc(
+        self,
+        uow: UnitOfWork,
+        tracking: ITrackingRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> DeactivateTrackingCodeUseCase:
+        return DeactivateTrackingCodeUseCase(uow, tracking, audit, clock)
+
+    # ---------- stats ----------
+
+    @provide
+    def get_funnel_uc(self, reader: IStatsReader) -> GetFunnelUseCase:
+        return GetFunnelUseCase(reader)
+
+    @provide
+    def get_dashboard_uc(self, reader: IStatsReader) -> GetDashboardUseCase:
+        return GetDashboardUseCase(reader)
+
+    # ---------- reference admin ----------
+
+    @provide
+    def list_fandoms_admin_uc(
+        self, repo: IFandomAdminRepository
+    ) -> ListFandomsAdminUseCase:
+        return ListFandomsAdminUseCase(repo)
+
+    @provide
+    def create_fandom_uc(
+        self,
+        uow: UnitOfWork,
+        repo: IFandomAdminRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> CreateFandomUseCase:
+        return CreateFandomUseCase(uow, repo, audit, clock)
+
+    @provide
+    def update_fandom_uc(
+        self,
+        uow: UnitOfWork,
+        repo: IFandomAdminRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> UpdateFandomUseCase:
+        return UpdateFandomUseCase(uow, repo, audit, clock)
+
+    @provide
+    def merge_tags_uc(
+        self,
+        uow: UnitOfWork,
+        repo: ITagAdminRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> MergeTagsUseCase:
+        return MergeTagsUseCase(uow, repo, audit, clock)
+
+    @provide
+    def list_merge_candidates_uc(
+        self, reader: ITagCandidatesReader
+    ) -> ListMergeCandidatesUseCase:
+        return ListMergeCandidatesUseCase(reader)
 
 
 def build_container() -> AsyncContainer:

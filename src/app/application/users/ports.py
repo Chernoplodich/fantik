@@ -30,3 +30,11 @@ class IUserRepository(Protocol):
     async def list_staff(self) -> list[UserId]:
         """Вернуть id всех пользователей с ролью moderator/admin (для нотификаций)."""
         ...
+
+    async def mark_bot_blocked(self, user_id: UserId) -> None:
+        """Отметить, что пользователь заблокировал бота (идемпотентно)."""
+        ...
+
+    async def clear_bot_blocked(self, user_id: UserId) -> None:
+        """Снять отметку блока (юзер нажал /start / явно нам написал)."""
+        ...

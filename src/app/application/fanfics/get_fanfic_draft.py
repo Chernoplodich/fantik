@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.application.fanfics.ports import (
+    FanficWithChapters,
     IFanficRepository,
     ITagRepository,
-    FanficWithChapters,
 )
 from app.core.errors import NotFoundError
 from app.domain.fanfics.exceptions import ForbiddenActionError

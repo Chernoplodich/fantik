@@ -14,7 +14,6 @@ from app.application.fanfics.ports import (
     IChapterRepository,
     IFanficRepository,
 )
-from app.application.users.ports import IUserRepository
 from app.application.reading.mark_completed import (
     MarkCompletedCommand,
     MarkCompletedUseCase,
@@ -44,6 +43,7 @@ from app.application.reading.toggle_like import (
     ToggleLikeUseCase,
 )
 from app.application.subscriptions.ports import ISubscriptionRepository
+from app.application.users.ports import IUserRepository
 from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.domain.fanfics.value_objects import FicStatus

@@ -28,7 +28,7 @@ class AuthorNick(str):
 
     __slots__ = ()
 
-    def __new__(cls, value: str) -> "AuthorNick":
+    def __new__(cls, value: str) -> AuthorNick:
         if not isinstance(value, str):
             raise ValidationError("author_nick must be a string")
         cleaned = value.strip()

@@ -83,9 +83,11 @@ from app.presentation.bot.keyboards.create_fanfic import (
 from app.presentation.bot.routers._chapter_buffer import (
     append_chunk,
     build_chapter_compose_kb,
-    dump_entities as _dump_entities,
     read_buffer,
     reset_buffer,
+)
+from app.presentation.bot.routers._chapter_buffer import (
+    dump_entities as _dump_entities,
 )
 from app.presentation.bot.texts.ru import t
 
@@ -259,7 +261,7 @@ async def request_revise(cb: CallbackQuery, callback_data: FanficCD) -> None:
         "Чтобы внести изменения, нужно:\n"
         "1. Включить режим правки (работа будет временно скрыта из каталога).\n"
         "2. Отредактировать нужные поля или главы.\n"
-        "3. Нажать «Отправить на модерацию» — модераторы рассмотрят правки и вернут работу в каталог."
+        "3. Нажать «Отправить на модерацию» — модераторы рассмотрят правки и вернут работу в каталог."  # noqa: E501
     )
     kb = InlineKeyboardMarkup(
         inline_keyboard=[

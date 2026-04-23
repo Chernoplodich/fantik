@@ -18,7 +18,6 @@ from app.domain.fanfics.events import (
 )
 from app.domain.fanfics.exceptions import WrongStatusError
 from app.domain.fanfics.value_objects import (
-    AgeRatingCode,
     ChapterNumber,
     ChapterTitle,
     FanficTitle,
@@ -33,7 +32,6 @@ from app.domain.shared.types import (
     FanficVersionId,
     UserId,
 )
-
 
 EDITABLE_STATUSES: frozenset[FicStatus] = frozenset(
     {FicStatus.DRAFT, FicStatus.REJECTED, FicStatus.REVISING}

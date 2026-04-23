@@ -9,7 +9,6 @@ from typing import Protocol
 from app.domain.fanfics.services.paginator import Page
 from app.domain.shared.types import ChapterId, FandomId, FanficId, UserId
 
-
 # ---------- DTO ----------
 
 

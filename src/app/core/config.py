@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     # ---------- broadcast ----------
     broadcast_rate: float = 25.0
     broadcast_rate_capacity: int = 25
+    broadcast_rate_paid: float = 1000.0
+    broadcast_rate_paid_capacity: int = 1000
+    broadcast_delivery_max_attempts: int = 3
+    broadcast_max_active: int = 3
     allow_paid_broadcast: bool = False
 
     # ---------- time ----------
