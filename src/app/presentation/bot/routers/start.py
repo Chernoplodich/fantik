@@ -10,9 +10,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from dishka.integrations.aiogram import FromDishka, inject
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 from app.application.users.register_user import RegisterUserCommand, RegisterUserUseCase
 from app.core.logging import get_logger
 from app.domain.users.value_objects import Role
+from app.presentation.bot.callback_data.reader import ReadNav
 from app.presentation.bot.fsm.states.onboarding import Onboarding
 from app.presentation.bot.keyboards.main_menu import (
     build_main_menu_kb,
@@ -90,11 +93,24 @@ async def cmd_start(
 
     # Уже прошёл онбординг → главное меню
     if special and special.startswith("fic_"):
-        await message.answer(
-            f"Открыть работу #{special[4:]} — в разработке.",
-            reply_markup=build_main_menu_kb(role=role, is_author=result.user.is_author),
-        )
-        return
+        fic_id_str = special[4:]
+        try:
+            fic_id = int(fic_id_str)
+        except ValueError:
+            fic_id = 0
+        if fic_id > 0:
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="📖 Открыть",
+                            callback_data=ReadNav(a="open", f=fic_id).pack(),
+                        )
+                    ]
+                ]
+            )
+            await message.answer("Открываю работу…", reply_markup=kb)
+            return
 
     await message.answer(
         t("welcome_back"),

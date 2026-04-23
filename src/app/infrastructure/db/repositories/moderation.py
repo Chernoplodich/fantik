@@ -61,9 +61,7 @@ class ModerationRepository(IModerationRepository):
         )
         return case
 
-    async def get_by_id(
-        self, case_id: ModerationCaseId
-    ) -> ModerationCase | None:
+    async def get_by_id(self, case_id: ModerationCaseId) -> ModerationCase | None:
         row = await self._s.get(MQModel, int(case_id))
         return mq_to_domain(row) if row else None
 
@@ -81,9 +79,7 @@ class ModerationRepository(IModerationRepository):
         row = (await self._s.execute(stmt)).scalar_one_or_none()
         return mq_to_domain(row) if row else None
 
-    async def pick_next(
-        self, *, moderator_id: UserId, now: datetime
-    ) -> ModerationCase | None:
+    async def pick_next(self, *, moderator_id: UserId, now: datetime) -> ModerationCase | None:
         # CTE + FOR UPDATE SKIP LOCKED + UPDATE RETURNING
         sql = text(
             """
@@ -105,9 +101,7 @@ class ModerationRepository(IModerationRepository):
             RETURNING mq.id
             """
         )
-        result = await self._s.execute(
-            sql, {"moderator_id": int(moderator_id), "now": now}
-        )
+        result = await self._s.execute(sql, {"moderator_id": int(moderator_id), "now": now})
         row = result.first()
         if row is None:
             return None
@@ -139,9 +133,7 @@ class ModerationRepository(IModerationRepository):
         )
         return bool(result.rowcount)
 
-    async def unlock(
-        self, *, case_id: ModerationCaseId, moderator_id: UserId
-    ) -> bool:
+    async def unlock(self, *, case_id: ModerationCaseId, moderator_id: UserId) -> bool:
         result = await self._s.execute(
             update(MQModel)
             .where(
@@ -153,6 +145,18 @@ class ModerationRepository(IModerationRepository):
             .values(locked_by=None, locked_until=None)
         )
         return bool(result.rowcount)
+
+    async def release_own_locks(self, *, moderator_id: UserId) -> int:
+        result = await self._s.execute(
+            update(MQModel)
+            .where(
+                MQModel.locked_by == int(moderator_id),
+                MQModel.decision.is_(None),
+                MQModel.cancelled_at.is_(None),
+            )
+            .values(locked_by=None, locked_until=None)
+        )
+        return int(result.rowcount or 0)
 
     async def release_stale_locks(self, *, now: datetime) -> int:
         result = await self._s.execute(
@@ -167,9 +171,7 @@ class ModerationRepository(IModerationRepository):
         )
         return int(result.rowcount or 0)
 
-    async def mark_cancelled(
-        self, *, case_id: ModerationCaseId, now: datetime
-    ) -> bool:
+    async def mark_cancelled(self, *, case_id: ModerationCaseId, now: datetime) -> bool:
         result = await self._s.execute(
             update(MQModel)
             .where(

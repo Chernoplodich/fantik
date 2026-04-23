@@ -23,12 +23,12 @@ async def _readyz(request: web.Request) -> web.Response:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         checks["pg"] = True
-    except Exception:  # noqa: BLE001
+    except Exception:
         checks["pg"] = False
     try:
         pong = await redis.ping()
         checks["redis"] = bool(pong)
-    except Exception:  # noqa: BLE001
+    except Exception:
         checks["redis"] = False
     status = 200 if all(checks.values()) else 503
     return web.json_response(checks, status=status)

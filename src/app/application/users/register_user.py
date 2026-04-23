@@ -55,7 +55,7 @@ class RegisterUserUseCase:
             if cmd.utm_code:
                 try:
                     code_str = TrackingCodeStr(cmd.utm_code)
-                except Exception:  # noqa: BLE001 — невалидный код → просто игнор
+                except Exception:
                     code_str = None
                 if code_str is not None:
                     code_id = await self._tracking.get_code_id(str(code_str))

@@ -51,10 +51,14 @@ class PickNextUseCase:
 
     async def __call__(self, cmd: PickNextCommand) -> PickNextResult:
         now = self._clock.now()
+        moderator_id = UserId(cmd.moderator_id)
         async with self._uow:
-            case = await self._moderation.pick_next(
-                moderator_id=UserId(cmd.moderator_id), now=now
-            )
+            # Освободить собственные lock'и — если модератор нажал «Следующая»
+            # не приняв решения по текущему case'у, он должен вернуться в очередь
+            # (иначе был бы закрыт lock'ом на 15 мин и не попался бы повторно).
+            await self._moderation.release_own_locks(moderator_id=moderator_id)
+
+            case = await self._moderation.pick_next(moderator_id=moderator_id, now=now)
             if case is None:
                 await self._uow.commit()
                 return PickNextResult(card=None)
@@ -68,6 +72,4 @@ class PickNextUseCase:
             self._uow.record_events(case.pull_events())
             await self._uow.commit()
 
-        return PickNextResult(
-            card=ModerationCaseCard(case=case, fic_bundle=bundle, tags=tags)
-        )
+        return PickNextResult(card=ModerationCaseCard(case=case, fic_bundle=bundle, tags=tags))

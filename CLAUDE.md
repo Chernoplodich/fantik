@@ -116,7 +116,7 @@ fantik/
 - [x] **Этап 1** — users + tracking + онбординг (`/start`, согласие с правилами, установка `author_nick`, `/admin`/`/mod` роли через seed)
 - [x] **Этап 2** — авторство + модерация (создание/правка фика, главы, submit/cancel/revise, очередь SKIP LOCKED, approve/reject с 7 причинами, audit_log, outbox, уведомления автору)
 - [x] **Этап 3** — читалка + пагинатор (`ChapterPaginator` с UTF-16 split + свойствами hypothesis, таблицы `bookmarks` / `likes` / `reads_completed` / `reading_progress`, Redis-кэш страниц на msgpack, TaskIQ `repaginate_chapter` + минимальный outbox-диспетчер на `fanfic.approved`, роутеры `reader` / `browse` / `shelf`, каталог «Новое»/«Топ»/«По фэндому», атомарные счётчики `fanfics.likes_count` и `fanfics.reads_completed_count`)
-- [ ] Этап 4 — поиск + каталог
+- [x] **Этап 4** — поиск + каталог (Meilisearch-адаптер `MeiliSearchIndex` с circuit-breaker + jitter, `application/search/` pure-ports и use cases `SearchUseCase`/`SuggestUseCase`/`IndexFanficUseCase`, TaskIQ `index_fanfic` / `full_reindex` / `delete_from_index` + расширенный outbox-диспетчер на `fanfic.approved|edited|archived`, `TaskiqSearchIndexQueue` с per-fic Redis-дебаунсом для `ToggleLike`, PG FTS-fallback через `chapters.tsv_text` + UI-баннер `degraded`, инлайн-режим `@bot <query>` с Redis-кэшем 60с и deep-link `?start=fic_<id>`, меню фильтров с мультиселектом фандомов/возраста/тегов/сортировки и курсорной пагинацией, `settings_bootstrap` применяется идемпотентно при старте bot-процесса)
 - [ ] Этап 5 — социалка (подписки, жалобы)
 - [ ] Этап 6 — админские инструменты (рассылки, статистика)
 - [ ] Этап 7 — hardening (метрики, нагрузочные, безопасность)

@@ -6,7 +6,7 @@ import asyncio
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
-from app.infrastructure.tasks.broker import broadcast_broker  # noqa: F401
+from app.infrastructure.tasks.broker import broadcast_broker
 
 if __name__ == "__main__":
     setup_logging(get_settings())

@@ -58,10 +58,10 @@ class Settings(BaseSettings):
     webhook_base_url: str = ""
     webhook_path: str = "/webhook"
     webhook_secret: SecretStr = SecretStr("")
-    webhook_host: str = "0.0.0.0"  # noqa: S104
+    webhook_host: str = "0.0.0.0"
     webhook_port: int = 8080
 
-    health_host: str = "0.0.0.0"  # noqa: S104
+    health_host: str = "0.0.0.0"
     health_port: int = 8080
     metrics_port: int = 8081
 

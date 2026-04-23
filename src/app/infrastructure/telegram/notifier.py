@@ -23,7 +23,7 @@ def _to_entities(raw: list[dict[str, Any]] | None) -> list[MessageEntity] | None
     for e in raw:
         try:
             out.append(MessageEntity.model_validate(e))
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
     return out or None
 

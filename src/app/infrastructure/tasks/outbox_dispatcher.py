@@ -4,11 +4,12 @@
 `FOR UPDATE SKIP LOCKED`, маршрутизирует их в TaskIQ-задачи по event_type
 и отмечает published_at = now().
 
-Сейчас понимает:
-- `fanfic.approved` → для каждого chapter_id из payload ставит `repaginate_chapter`.
+Маршруты:
+- `fanfic.approved`  → `repaginate_chapter(chapter_id)` для каждой главы + `index_fanfic(fic_id)`
+- `fanfic.edited`    → `index_fanfic(fic_id)`
+- `fanfic.archived`  → `index_fanfic(fic_id)` (задача сама удалит документ по статусу)
 
-Остальные события просто пропускает с пометкой published_at, чтобы они не
-копились. Расширяем по мере появления обработчиков в следующих этапах.
+Остальные события пропускаются с пометкой published_at, чтобы не копились.
 """
 
 from __future__ import annotations
@@ -22,26 +23,51 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.infrastructure.tasks._container import get_worker_container
 from app.infrastructure.tasks.broker import broker
+from app.infrastructure.tasks.indexing import index_fanfic
 from app.infrastructure.tasks.repagination import repaginate_chapter
 
 log = get_logger(__name__)
 
 _BATCH_SIZE = 50
 
+_INDEX_EVENTS = frozenset({"fanfic.approved", "fanfic.edited", "fanfic.archived"})
+
+
+async def _enqueue_index(fic_id: int) -> None:
+    try:
+        await index_fanfic.kiq(fic_id)
+    except Exception as e:
+        log.warning("outbox_dispatch_index_enqueue_failed", fic_id=fic_id, error=str(e))
+
+
+async def _enqueue_repaginate(chapter_id: int) -> None:
+    try:
+        await repaginate_chapter.kiq(chapter_id)
+    except Exception as e:
+        log.warning(
+            "outbox_dispatch_repaginate_enqueue_failed",
+            chapter_id=chapter_id,
+            error=str(e),
+        )
+
 
 async def _dispatch_one(event_type: str, payload: dict[str, Any]) -> None:
     if event_type == "fanfic.approved":
         chapter_ids = payload.get("chapter_ids") or []
         for ch_id in chapter_ids:
-            try:
-                await repaginate_chapter.kiq(int(ch_id))
-            except Exception as e:  # noqa: BLE001 — не роняем диспетчер
-                log.warning(
-                    "outbox_dispatch_enqueue_failed",
-                    event_type=event_type,
-                    chapter_id=ch_id,
-                    error=str(e),
-                )
+            await _enqueue_repaginate(int(ch_id))
+        fic_id = payload.get("fic_id")
+        if fic_id is not None:
+            await _enqueue_index(int(fic_id))
+        return
+
+    if event_type in _INDEX_EVENTS:
+        fic_id = payload.get("fic_id")
+        if fic_id is not None:
+            await _enqueue_index(int(fic_id))
+        return
+
+    # неизвестные/не-индекс события — просто маркируем как обработанные, чтобы не копились
 
 
 async def _process_batch(session: AsyncSession) -> int:
@@ -66,7 +92,7 @@ async def _process_batch(session: AsyncSession) -> int:
         payload = dict(row.payload or {})
         try:
             await _dispatch_one(event_type, payload)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception(
                 "outbox_dispatch_failed",
                 event_id=event_id,

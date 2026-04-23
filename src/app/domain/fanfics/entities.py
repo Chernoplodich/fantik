@@ -270,11 +270,7 @@ class Fanfic(EventEmitter):
             self.first_published_at = now
         self.current_version_id = version_id
         self.updated_at = now
-        self._emit(
-            FanficApproved(
-                fic_id=self.id, author_id=self.author_id, first_publish=first
-            )
-        )
+        self._emit(FanficApproved(fic_id=self.id, author_id=self.author_id, first_publish=first))
 
     def reject(self, *, reason_ids: list[int], now: datetime) -> None:
         if self.status != FicStatus.PENDING:
@@ -290,8 +286,17 @@ class Fanfic(EventEmitter):
         )
 
     def mark_revising(self, *, now: datetime) -> None:
-        if self.status != FicStatus.REJECTED:
-            raise WrongStatusError("Начать доработку можно только из rejected.")
+        """Открыть режим правки.
+
+        Разрешено из:
+        - REJECTED  → автор «Доработать» после отказа.
+        - APPROVED  → автор «Внести правку» в опубликованную работу; до новой
+          модерации фик временно выпадает из каталога.
+        """
+        if self.status not in (FicStatus.REJECTED, FicStatus.APPROVED):
+            raise WrongStatusError(
+                "Начать правку можно только из опубликованной или отклонённой работы."
+            )
         self.status = FicStatus.REVISING
         self.updated_at = now
 

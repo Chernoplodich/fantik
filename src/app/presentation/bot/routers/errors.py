@@ -34,6 +34,6 @@ async def on_error(event: ErrorEvent) -> bool:
                 str(exc) if isinstance(exc, DomainError) and str(exc) else t("error_generic"),
                 show_alert=True,
             )
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.warning("failed_to_notify_user_about_error")
     return True  # помечаем обработанным

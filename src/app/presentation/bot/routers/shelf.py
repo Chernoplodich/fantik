@@ -54,7 +54,7 @@ async def _render(
             return
         try:
             await cb_or_msg.message.edit_text(body, reply_markup=kb)  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
+        except Exception:
             await cb_or_msg.message.answer(body, reply_markup=kb)
     else:
         await cb_or_msg.answer(body, reply_markup=kb)

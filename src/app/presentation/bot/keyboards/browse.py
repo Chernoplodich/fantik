@@ -16,12 +16,16 @@ def _btn(text: str, callback_data: str) -> InlineKeyboardButton:
 
 
 def browse_root_kb() -> InlineKeyboardMarkup:
+    # Локальный импорт: избегаем циклов при инициализации модулей keyboards/*.
+    from app.presentation.bot.callback_data.search import SearchCD
+
     b = InlineKeyboardBuilder()
     b.row(
         _btn("🆕 Новое", BrowseCD(a="new").pack()),
         _btn("🔥 Топ", BrowseCD(a="top").pack()),
     )
     b.row(_btn("🏷 По фэндому", BrowseCD(a="by_fandom").pack()))
+    b.row(_btn("🔎 Фильтры", SearchCD(a="filters_root").pack()))
     b.row(_btn("← Главное меню", "menu:back"))
     return b.as_markup()
 

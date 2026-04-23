@@ -45,9 +45,7 @@ class IModerationRepository(Protocol):
         """Вернуть незакрытый case для фика (decision IS NULL AND cancelled_at IS NULL)."""
         ...
 
-    async def pick_next(
-        self, *, moderator_id: UserId, now: datetime
-    ) -> ModerationCase | None:
+    async def pick_next(self, *, moderator_id: UserId, now: datetime) -> ModerationCase | None:
         """Атомарно залочить следующую задачу через CTE + SKIP LOCKED + UPDATE RETURNING.
 
         WHERE decision IS NULL AND cancelled_at IS NULL
@@ -63,25 +61,30 @@ class IModerationRepository(Protocol):
         """
         ...
 
-    async def unlock(
-        self, *, case_id: ModerationCaseId, moderator_id: UserId
-    ) -> bool: ...
+    async def unlock(self, *, case_id: ModerationCaseId, moderator_id: UserId) -> bool: ...
+
+    async def release_own_locks(self, *, moderator_id: UserId) -> int:
+        """Снять все lock'и модератора на ещё не решённых case'ах.
+
+        Вызывается перед `pick_next` — если модератор пропустил текущую работу
+        кликом «Следующая», его предыдущий case возвращается в очередь и
+        снова попадёт под его же SKIP LOCKED (иначе был бы закрыт 15 мин).
+
+        Возвращает число снятых lock'ов.
+        """
+        ...
 
     async def release_stale_locks(self, *, now: datetime) -> int:
         """Вернуть число снятых lock'ов (locked_until < now)."""
         ...
 
-    async def mark_cancelled(
-        self, *, case_id: ModerationCaseId, now: datetime
-    ) -> bool: ...
+    async def mark_cancelled(self, *, case_id: ModerationCaseId, now: datetime) -> bool: ...
 
 
 class IReasonRepository(Protocol):
     async def list_active(self) -> list[RejectionReason]: ...
 
-    async def get_by_ids(
-        self, reason_ids: list[ModerationReasonId]
-    ) -> list[RejectionReason]: ...
+    async def get_by_ids(self, reason_ids: list[ModerationReasonId]) -> list[RejectionReason]: ...
 
 
 class IModeratorNotifier(Protocol):

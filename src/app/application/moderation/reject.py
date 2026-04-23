@@ -168,5 +168,5 @@ class RejectUseCase:
                     comment=comment,
                     comment_entities=entities,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass

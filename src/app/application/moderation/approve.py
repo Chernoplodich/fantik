@@ -149,5 +149,5 @@ class ApproveUseCase:
                     fic_id=notify_fic_id,
                     fic_title=notify_title,
                 )
-            except Exception:  # noqa: BLE001 — нотификатор не роллбэкает БД
+            except Exception:
                 pass

@@ -60,6 +60,6 @@ class ThrottleMiddleware(BaseMiddleware):
                     await event.answer(t("throttle_warning"), show_alert=False)
                 elif isinstance(event, Message):
                     await event.answer(t("throttle_warning"))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.warning("throttle_notice_failed", uid=from_user.id)
         return None

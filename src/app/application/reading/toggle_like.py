@@ -1,4 +1,10 @@
-"""Use case: toggle like (insert + atomic increment / delete + atomic decrement)."""
+"""Use case: toggle like (insert + atomic increment / delete + atomic decrement).
+
+После коммита транзакции планируется debounced переиндексация фика (per-fic,
+TTL 60с в Redis). Это ЕДИНСТВЕННЫЙ случай, когда use case вызывает
+ISearchIndexQueue напрямую — все остальные операции (approve/edit/archive)
+идут через outbox-диспетчер.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +12,7 @@ from dataclasses import dataclass
 
 from app.application.fanfics.ports import IFanficRepository
 from app.application.reading.ports import ILikesRepository
+from app.application.search.ports import ISearchIndexQueue
 from app.application.shared.ports import UnitOfWork
 from app.core.clock import Clock
 from app.core.errors import NotFoundError
@@ -30,11 +37,13 @@ class ToggleLikeUseCase:
         uow: UnitOfWork,
         fanfics: IFanficRepository,
         likes: ILikesRepository,
+        search_queue: ISearchIndexQueue,
         clock: Clock,
     ) -> None:
         self._uow = uow
         self._fanfics = fanfics
         self._likes = likes
+        self._search_queue = search_queue
         self._clock = clock
 
     async def __call__(self, cmd: ToggleLikeCommand) -> ToggleLikeResult:
@@ -51,10 +60,13 @@ class ToggleLikeUseCase:
             if inserted:
                 await self._fanfics.increment_likes(fic_id)
                 await self._uow.commit()
+                await self._search_queue.enqueue_debounced(fic_id)
                 return ToggleLikeResult(now_liked=True)
 
             removed = await self._likes.remove(user_id, fic_id)
             if removed:
                 await self._fanfics.decrement_likes(fic_id)
             await self._uow.commit()
+            if removed:
+                await self._search_queue.enqueue_debounced(fic_id)
             return ToggleLikeResult(now_liked=False)

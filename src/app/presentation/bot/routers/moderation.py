@@ -10,10 +10,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from dishka.integrations.aiogram import FromDishka, inject
 
-from app.application.fanfics.ports import IChapterRepository, IReferenceReader, ITagRepository
-from app.application.users.ports import IUserRepository
+from aiogram.exceptions import TelegramBadRequest
+
+from app.application.fanfics.ports import (
+    IChapterRepository,
+    IFanficRepository,
+    IReferenceReader,
+    ITagRepository,
+)
 from app.application.moderation.approve import ApproveCommand, ApproveUseCase
 from app.application.moderation.list_reasons import ListReasonsUseCase
+from app.application.moderation.ports import IModerationRepository
 from app.application.moderation.pick_next import (
     PickNextCommand,
     PickNextUseCase,
@@ -23,8 +30,11 @@ from app.application.moderation.release_stale_locks import (
     ReleaseStaleLocksUseCase,
 )
 from app.application.moderation.unlock import UnlockCaseUseCase, UnlockCommand
+from app.application.users.ports import IUserRepository
 from app.core.errors import DomainError
-from app.domain.shared.types import ChapterId, FandomId
+from app.core.logging import get_logger
+from app.domain.fanfics.services.paginator import ChapterPaginator
+from app.domain.shared.types import ChapterId, FandomId, ModerationCaseId
 from app.presentation.bot.callback_data.moderation import ModCD, ReasonCD
 from app.presentation.bot.filters.role import IsAdmin, IsModerator
 from app.presentation.bot.fsm.states.moderation_reject import (
@@ -33,10 +43,13 @@ from app.presentation.bot.fsm.states.moderation_reject import (
 from app.presentation.bot.keyboards.moderation import (
     build_mod_card_kb,
     build_mod_menu_kb,
+    build_mod_page_kb,
     build_reason_picker_kb,
     build_reject_preview_kb,
 )
 from app.presentation.bot.texts.ru import t
+
+log = get_logger(__name__)
 
 router = Router(name="moderation")
 
@@ -120,46 +133,209 @@ async def pick_next(
                 parse_mode="HTML",
                 reply_markup=kb,
             )
-        except Exception:  # noqa: BLE001 — fallback на текст если file_id невалиден
+        except Exception:
             await cb.message.answer(text, parse_mode="HTML", reply_markup=kb)
     else:
         await cb.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await cb.answer()
 
 
-# ---------- read chapter ----------
+# ---------- read chapter: ОДНО сообщение + пагинация ----------
 
 
-@router.callback_query(
-    ModCD.filter(F.action == "read_chapter"), IsModerator()
-)
+@router.callback_query(ModCD.filter(F.action == "read_chapter"), IsModerator())
 @inject
 async def read_chapter(
     cb: CallbackQuery,
     callback_data: ModCD,
     chapters: FromDishka[IChapterRepository],
 ) -> None:
+    """Открыть страницу 1 главы. Reading-стиль: ОДНО сообщение с навигацией.
+
+    Карточка модератора может быть фото (если у фика есть cover): тогда
+    удаляем её и шлём новое текстовое сообщение. Дальше листание prev/next
+    идёт через edit_message_text — никакого спама.
+    """
     if cb.message is None:
         await cb.answer()
         return
-    ch = await chapters.get(ChapterId(callback_data.chapter_id))
+    await _render_mod_page(
+        cb,
+        chapters_repo=chapters,
+        case_id=callback_data.case_id,
+        chapter_id=callback_data.chapter_id,
+        page_no=1,
+        allow_delete_photo=True,
+    )
+
+
+@router.callback_query(ModCD.filter(F.action == "mod_page"), IsModerator())
+@inject
+async def mod_page(
+    cb: CallbackQuery,
+    callback_data: ModCD,
+    chapters: FromDishka[IChapterRepository],
+) -> None:
+    """Навигация ◀▶ в пределах открытой главы — edit_message_text."""
+    if cb.message is None:
+        await cb.answer()
+        return
+    await _render_mod_page(
+        cb,
+        chapters_repo=chapters,
+        case_id=callback_data.case_id,
+        chapter_id=callback_data.chapter_id,
+        page_no=callback_data.page_no or 1,
+        allow_delete_photo=False,
+    )
+
+
+@router.callback_query(ModCD.filter(F.action == "back_to_card"), IsModerator())
+@inject
+async def back_to_card(
+    cb: CallbackQuery,
+    callback_data: ModCD,
+    moderation: FromDishka[IModerationRepository],
+    fanfics: FromDishka[IFanficRepository],
+    chapters_repo: FromDishka[IChapterRepository],
+    tags_repo: FromDishka[ITagRepository],
+    reference: FromDishka[IReferenceReader],
+    users_repo: FromDishka[IUserRepository],
+) -> None:
+    """Вернуться к карточке фика из режима чтения главы."""
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+
+    case = await moderation.get_by_id(ModerationCaseId(callback_data.case_id))
+    if case is None:
+        await cb.answer("Задание не найдено.", show_alert=True)
+        return
+
+    fic = await fanfics.get(case.fic_id)
+    if fic is None:
+        await cb.answer("Фик не найден.", show_alert=True)
+        return
+
+    chapters = await chapters_repo.list_by_fic(fic.id)
+    tags = await tags_repo.list_by_fic(fic.id)
+    fandom = await reference.get_fandom(FandomId(int(fic.fandom_id)))
+    rating = await reference.get_age_rating(int(fic.age_rating_id))
+    author = await users_repo.get(fic.author_id)
+
+    from html import escape as _h
+
+    author_line = _build_author_line(
+        author_id=int(fic.author_id),
+        author_nick=author.author_nick if author else None,
+        username=author.username if author else None,
+    )
+    text = t(
+        "mod_card_header",
+        case_id=int(case.id),
+        kind=case.kind.value,
+        author_line=author_line,
+        title=_h(str(fic.title)),
+        fandom=_h(fandom.name) if fandom else "—",
+        rating=_h(rating.code) if rating else "—",
+        tags=_h(", ".join(str(tag.name) for tag in tags)) or "—",
+        chapters_count=fic.chapters_count,
+        summary=_h(str(fic.summary)),
+    )
+    chapter_ids = [(int(ch.id), int(ch.number)) for ch in chapters]
+    kb = build_mod_card_kb(case_id=int(case.id), chapter_ids=chapter_ids)
+
+    # Текущее сообщение — текстовая страница главы. Достаточно edit_text.
+    try:
+        await cb.message.edit_text(text, parse_mode="HTML", reply_markup=kb)  # type: ignore[union-attr]
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            log.warning("back_to_card_edit_failed", error=str(e))
+            # fallback: отправим новое сообщение
+            await cb.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    await cb.answer()
+
+
+async def _render_mod_page(
+    cb: CallbackQuery,
+    *,
+    chapters_repo: IChapterRepository,
+    case_id: int,
+    chapter_id: int,
+    page_no: int,
+    allow_delete_photo: bool,
+) -> None:
+    """Отрендерить страницу главы в режиме модератора.
+
+    `allow_delete_photo=True` — first-time open из карточки: если текущее
+    сообщение было photo (cover), удаляем его и шлём новое текстовое.
+    При последующих листаниях текущее сообщение уже текст → просто edit.
+    """
+    if cb.message is None:
+        return
+
+    ch = await chapters_repo.get(ChapterId(chapter_id))
     if ch is None:
         await cb.answer("Глава не найдена.", show_alert=True)
         return
-    text = t("mod_chapter_header", number=int(ch.number), title=str(ch.title), text=ch.text)
-    # Пытаемся отдать entities автора — они в Telegram API формате.
+
+    pages = ChapterPaginator.paginate(ch.text, list(ch.entities or []))
+    if not pages:
+        await cb.answer("Глава пуста.", show_alert=True)
+        return
+
+    page_no = max(1, min(page_no, len(pages)))
+    page = pages[page_no - 1]
+
     from aiogram.types import MessageEntity
 
     entities: list[MessageEntity] = []
-    for e in ch.entities:
+    for e in page.entities:
         try:
             entities.append(MessageEntity.model_validate(e))
         except Exception:  # noqa: BLE001
             continue
-    # Заголовок добавляет сдвиг — сбрасываем entities, показываем «сырой» текст без заголовка,
-    # иначе offsets не совпадают. Посылаем отдельным сообщением.
-    await cb.message.answer(f"📖 Глава {int(ch.number)}. {str(ch.title)}")
-    await cb.message.answer(ch.text, entities=entities or None)
+
+    kb = build_mod_page_kb(
+        case_id=case_id,
+        chapter_id=chapter_id,
+        chapter_no=int(ch.number),
+        page_no=page_no,
+        total_pages=len(pages),
+    )
+    title_line = f"📖 Глава {int(ch.number)}. {ch.title}\n\n"
+    full_text = title_line + page.text
+    # Сдвиг entities на длину title_line в UTF-16.
+    from app.domain.shared.utf16 import utf16_length
+
+    shift = utf16_length(title_line)
+    shifted: list[MessageEntity] = []
+    for me in entities:
+        shifted.append(me.model_copy(update={"offset": me.offset + shift}))
+
+    try:
+        if allow_delete_photo and cb.message.photo:  # type: ignore[union-attr]
+            # Карточка-фото: удаляем, шлём новое текстовое сообщение.
+            try:
+                await cb.message.delete()  # type: ignore[union-attr]
+            except TelegramBadRequest:
+                pass
+            await cb.message.answer(
+                full_text,
+                entities=shifted or None,
+                reply_markup=kb,
+            )
+        else:
+            await cb.message.edit_text(  # type: ignore[union-attr]
+                full_text,
+                entities=shifted or None,
+                reply_markup=kb,
+            )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            pass
+        else:
+            log.warning("mod_render_page_failed", error=str(e))
     await cb.answer()
 
 
@@ -185,9 +361,7 @@ async def approve(
         return
     await _deactivate_card(cb)
     if cb.message is not None:
-        await cb.message.answer(
-            t("mod_decision_applied"), reply_markup=build_mod_menu_kb()
-        )
+        await cb.message.answer(t("mod_decision_applied"), reply_markup=build_mod_menu_kb())
     await cb.answer()
 
 
@@ -329,16 +503,12 @@ async def reject_confirm(
     await state.clear()
     await _deactivate_card(cb)
     if cb.message is not None:
-        await cb.message.answer(
-            t("mod_decision_applied"), reply_markup=build_mod_menu_kb()
-        )
+        await cb.message.answer(t("mod_decision_applied"), reply_markup=build_mod_menu_kb())
     await cb.answer()
 
 
 @router.callback_query(ModerationRejectStates.confirming, ModCD.filter(F.action == "menu"))
-async def reject_cancel_confirm(
-    cb: CallbackQuery, state: FSMContext
-) -> None:
+async def reject_cancel_confirm(cb: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     if cb.message is not None:
         await cb.message.answer(t("mod_menu"), reply_markup=build_mod_menu_kb())
@@ -359,9 +529,7 @@ async def unlock(
         await cb.answer()
         return
     try:
-        await unlock_uc(
-            UnlockCommand(case_id=callback_data.case_id, moderator_id=cb.from_user.id)
-        )
+        await unlock_uc(UnlockCommand(case_id=callback_data.case_id, moderator_id=cb.from_user.id))
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
         return
@@ -404,9 +572,7 @@ def _build_author_line(
         parts.append(f"<b>{_h(author_nick)}</b>")
     if username:
         parts.append(f"(@{_h(username)})")
-    parts.append(
-        f'<a href="tg://user?id={author_id}">id{author_id}</a>'
-    )
+    parts.append(f'<a href="tg://user?id={author_id}">id{author_id}</a>')
     return " ".join(parts)
 
 
@@ -419,7 +585,7 @@ async def _deactivate_card(cb: CallbackQuery) -> None:
         return
     try:
         await cb.message.edit_reply_markup(reply_markup=None)
-    except Exception:  # noqa: BLE001 — не критично, если нельзя отредактировать
+    except Exception:
         pass
 
 

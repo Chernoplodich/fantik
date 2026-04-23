@@ -26,6 +26,7 @@ from app.presentation.bot.routers import author_create as author_create_router
 from app.presentation.bot.routers import author_manage as author_manage_router
 from app.presentation.bot.routers import browse as browse_router
 from app.presentation.bot.routers import errors as errors_router
+from app.presentation.bot.routers import inline_search as inline_search_router
 from app.presentation.bot.routers import menu as menu_router
 from app.presentation.bot.routers import moderation as moderation_router
 from app.presentation.bot.routers import onboarding as onboarding_router
@@ -57,6 +58,7 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     dp.include_router(browse_router.router)
     dp.include_router(reader_router.router)
     dp.include_router(shelf_router.router)
+    dp.include_router(inline_search_router.router)
     dp.include_router(menu_router.router)
     return dp
 
@@ -147,6 +149,24 @@ async def _run_webhook(
         await runner.cleanup()
 
 
+async def _bootstrap_search(container: AsyncContainer) -> None:
+    """Идемпотентное применение настроек Meilisearch-индекса при старте.
+
+    Best-effort: если Meili недоступен, логируем warning и продолжаем
+    (fallback PG FTS всё равно подхватит поиск).
+    """
+    from meilisearch_python_sdk import AsyncClient as _MeiliClient
+
+    from app.infrastructure.search import settings_bootstrap as _sb
+
+    try:
+        client: _MeiliClient = await container.get(_MeiliClient)
+        await _sb.apply(client)
+        log.info("meili_bootstrap_done")
+    except Exception as e:  # noqa: BLE001
+        log.warning("meili_bootstrap_failed", error=str(e))
+
+
 async def main() -> None:
     container = build_container()
     settings = await container.get(Settings)
@@ -155,6 +175,9 @@ async def main() -> None:
 
     # Seed админы до старта хэндлеров
     await _seed_admins(container, settings)
+
+    # Meilisearch settings: идемпотентно применяются один раз при старте.
+    await _bootstrap_search(container)
 
     bot: Bot = await container.get(Bot)
 

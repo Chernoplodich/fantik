@@ -28,7 +28,14 @@ from app.application.fanfics.create_draft import (
 )
 from app.application.fanfics.ports import IReferenceReader
 from app.core.config import Settings
-from app.core.errors import DomainError
+from app.core.errors import DomainError, ValidationError
+from app.domain.fanfics.value_objects import (
+    MAX_TAGS_PER_FIC,
+    ChapterTitle,
+    FanficTitle,
+    Summary,
+    TagName,
+)
 from app.presentation.bot.callback_data.fanfic import (
     AgeRatingCD,
     FandomPickCD,
@@ -106,7 +113,12 @@ async def on_title(message: Message, state: FSMContext) -> None:
     if not message.text:
         await message.answer(t("fic_expect_text"))
         return
-    await state.update_data(title=message.text)
+    try:
+        title = FanficTitle(message.text)
+    except ValidationError as e:
+        await message.answer(str(e), reply_markup=build_cancel_kb())
+        return
+    await state.update_data(title=str(title))
     await state.set_state(CreateFanficStates.waiting_summary)
     await message.answer(t("fic_create_summary_prompt"), reply_markup=build_cancel_kb())
 
@@ -124,8 +136,13 @@ async def on_summary(
     if not message.text:
         await message.answer(t("fic_expect_text"))
         return
+    try:
+        summary = Summary(message.text)
+    except ValidationError as e:
+        await message.answer(str(e), reply_markup=build_cancel_kb())
+        return
     entities = _dump_entities(message.entities)
-    await state.update_data(summary=message.text, summary_entities=entities)
+    await state.update_data(summary=str(summary), summary_entities=entities)
     await _prompt_fandom_page(message, state, reference, page=0)
 
 
@@ -149,9 +166,7 @@ async def _prompt_fandom_page(
 # ---------- fandom ----------
 
 
-@router.callback_query(
-    CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page")
-)
+@router.callback_query(CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page"))
 @inject
 async def on_fandom_page(
     cb: CallbackQuery,
@@ -168,16 +183,12 @@ async def on_fandom_page(
         active_only=True,
     )
     await cb.message.edit_reply_markup(
-        reply_markup=build_fandom_picker_kb(
-            fandoms=fandoms, page=callback_data.page, total=total
-        )
+        reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=callback_data.page, total=total)
     )
     await cb.answer()
 
 
-@router.callback_query(
-    CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick")
-)
+@router.callback_query(CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick"))
 @inject
 async def on_fandom_pick(
     cb: CallbackQuery,
@@ -225,6 +236,18 @@ async def on_tags(message: Message, state: FSMContext) -> None:
         tag_raws: list[str] = []
     else:
         tag_raws = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(tag_raws) > MAX_TAGS_PER_FIC:
+        await message.answer(
+            f"Слишком много тегов: {len(tag_raws)}. Максимум — {MAX_TAGS_PER_FIC}.",
+            reply_markup=build_cancel_kb(),
+        )
+        return
+    for raw_tag in tag_raws:
+        try:
+            TagName(raw_tag)
+        except ValidationError as e:
+            await message.answer(f"Тег «{raw_tag[:50]}»: {e}", reply_markup=build_cancel_kb())
+            return
     await state.update_data(tag_raws=tag_raws)
     await state.set_state(CreateFanficStates.waiting_cover)
     await message.answer(t("fic_create_cover_prompt"), reply_markup=build_cover_kb())
@@ -261,7 +284,9 @@ async def _prompt_chapter_or_submit(message: Message, state: FSMContext) -> None
     fic_id = data.get("fic_id") or 0
     await message.answer(
         t("fic_create_chapter_or_submit", fic_id=fic_id or "—"),
-        reply_markup=_placeholder_kb_before_first_chapter() if not fic_id else build_chapter_or_submit_kb(int(fic_id)),
+        reply_markup=_placeholder_kb_before_first_chapter()
+        if not fic_id
+        else build_chapter_or_submit_kb(int(fic_id)),
     )
 
 
@@ -276,9 +301,7 @@ def _placeholder_kb_before_first_chapter() -> Any:
     return b.as_markup()
 
 
-@router.callback_query(
-    CreateFanficStates.chapter_or_submit, F.data == "fic_create:first_chapter"
-)
+@router.callback_query(CreateFanficStates.chapter_or_submit, F.data == "fic_create:first_chapter")
 async def on_first_chapter(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(CreateFanficStates.waiting_chapter_title)
     if cb.message is not None:
@@ -290,9 +313,7 @@ async def on_first_chapter(cb: CallbackQuery, state: FSMContext) -> None:
     CreateFanficStates.chapter_or_submit,
     FanficCD.filter(F.action == "add_chapter"),
 )
-async def on_add_chapter_btn(
-    cb: CallbackQuery, callback_data: FanficCD, state: FSMContext
-) -> None:
+async def on_add_chapter_btn(cb: CallbackQuery, callback_data: FanficCD, state: FSMContext) -> None:
     await state.update_data(fic_id=callback_data.fic_id)
     await state.set_state(CreateFanficStates.waiting_chapter_title)
     if cb.message is not None:
@@ -304,13 +325,16 @@ async def on_add_chapter_btn(
 
 
 @router.message(CreateFanficStates.waiting_chapter_title)
-async def on_chapter_title(
-    message: Message, state: FSMContext
-) -> None:
+async def on_chapter_title(message: Message, state: FSMContext) -> None:
     if not message.text:
         await message.answer(t("fic_expect_text"))
         return
-    await state.update_data(chapter_title=message.text)
+    try:
+        ch_title = ChapterTitle(message.text)
+    except ValidationError as e:
+        await message.answer(str(e))
+        return
+    await state.update_data(chapter_title=str(ch_title))
     await reset_buffer(state)
     await state.set_state(CreateFanficStates.waiting_chapter_text)
     await message.answer(t("fic_create_chapter_text_prompt", max_chars=100_000))
@@ -350,9 +374,7 @@ async def on_chapter_text_bad(message: Message) -> None:
     await message.answer(t("fic_expect_text"))
 
 
-@router.callback_query(
-    CreateFanficStates.waiting_chapter_text, F.data == "chapter:cancel"
-)
+@router.callback_query(CreateFanficStates.waiting_chapter_text, F.data == "chapter:cancel")
 async def on_chapter_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await reset_buffer(state)
     data = await state.get_data()
@@ -372,9 +394,7 @@ async def on_chapter_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer()
 
 
-@router.callback_query(
-    CreateFanficStates.waiting_chapter_text, F.data == "chapter:finish"
-)
+@router.callback_query(CreateFanficStates.waiting_chapter_text, F.data == "chapter:finish")
 @inject
 async def on_chapter_finish(
     cb: CallbackQuery,

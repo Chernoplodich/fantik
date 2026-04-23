@@ -490,7 +490,7 @@ async def _save_progress_safe(
                 page_no=page_no,
             )
         )
-    except Exception as e:  # noqa: BLE001 — не должно ломать чтение
+    except Exception as e:
         log.warning("save_progress_failed", error=str(e))
 
 

@@ -108,15 +108,9 @@ class FakeUsers(IUserRepository):
         u = self._by_id.get(user_id)
         return u.role.value if u else None
 
-    async def is_nick_taken(
-        self, nick_lower: str, *, except_user_id: UserId | None = None
-    ) -> bool:
+    async def is_nick_taken(self, nick_lower: str, *, except_user_id: UserId | None = None) -> bool:
         for u in self._by_id.values():
-            if (
-                u.author_nick
-                and u.author_nick.lowered == nick_lower
-                and u.id != except_user_id
-            ):
+            if u.author_nick and u.author_nick.lowered == nick_lower and u.id != except_user_id:
                 return True
         return False
 
@@ -146,9 +140,7 @@ class FakeFanfics(IFanficRepository):
     async def get(self, fic_id: FanficId) -> Fanfic | None:
         return self._by_id.get(fic_id)
 
-    async def get_with_chapters(
-        self, fic_id: FanficId
-    ) -> FanficWithChapters | None:
+    async def get_with_chapters(self, fic_id: FanficId) -> FanficWithChapters | None:
         f = self._by_id.get(fic_id)
         if f is None:
             return None
@@ -177,9 +169,7 @@ class FakeFanfics(IFanficRepository):
         ]
         return mine[offset : offset + limit], len(mine)
 
-    async def count_submitted_today(
-        self, *, author_id: UserId, tz: str
-    ) -> int:
+    async def count_submitted_today(self, *, author_id: UserId, tz: str) -> int:
         return self.submitted_today
 
 
@@ -204,11 +194,7 @@ class FakeChapters(IChapterRepository):
     async def list_by_fic_and_statuses(
         self, fic_id: FanficId, statuses: list[FicStatus]
     ) -> list[Chapter]:
-        return [
-            c
-            for c in self._by_id.values()
-            if c.fic_id == fic_id and c.status in statuses
-        ]
+        return [c for c in self._by_id.values() if c.fic_id == fic_id and c.status in statuses]
 
     async def delete(self, chapter_id: ChapterId) -> None:
         self._by_id.pop(chapter_id, None)
@@ -226,30 +212,22 @@ class FakeTags(ITagRepository):
         self._by_slug: dict[str, TagRef] = {}
         self._seq = 0
 
-    async def ensure(
-        self, *, name: TagName, slug: TagSlug, kind: str
-    ) -> tuple[TagRef, bool]:
+    async def ensure(self, *, name: TagName, slug: TagSlug, kind: str) -> tuple[TagRef, bool]:
         existing = self._by_slug.get(str(slug))
         if existing:
             return existing, False
         self._seq += 1
-        ref = TagRef(
-            id=TagId(self._seq), name=name, slug=slug, kind=kind, approved=False
-        )
+        ref = TagRef(id=TagId(self._seq), name=name, slug=slug, kind=kind, approved=False)
         self._by_slug[str(slug)] = ref
         return ref, True
 
     async def list_by_fic(self, fic_id: FanficId) -> list[TagRef]:
         return []
 
-    async def list_by_fic_ids(
-        self, fic_ids: list[FanficId]
-    ) -> dict[FanficId, list[TagRef]]:
+    async def list_by_fic_ids(self, fic_ids: list[FanficId]) -> dict[FanficId, list[TagRef]]:
         return {fid: [] for fid in fic_ids}
 
-    async def replace_for_fic(
-        self, *, fic_id: FanficId, tag_ids: list[TagId]
-    ) -> None:
+    async def replace_for_fic(self, *, fic_id: FanficId, tag_ids: list[TagId]) -> None:
         return None
 
 
@@ -287,9 +265,7 @@ class FakeVersions(IFanficVersionRepository):
 
 class FakeReference(IReferenceReader):
     def __init__(self) -> None:
-        self.fandom = FandomRef(
-            id=FandomId(1), slug="hp", name="Harry Potter", category="books"
-        )
+        self.fandom = FandomRef(id=FandomId(1), slug="hp", name="Harry Potter", category="books")
         self.rating = AgeRatingRef(
             id=1,
             code=AgeRatingCode("PG"),
@@ -319,9 +295,7 @@ class FakeOutbox(IOutboxRepository):
         self.events: list[tuple[str, dict[str, Any]]] = []
         self._seq = 0
 
-    async def append(
-        self, *, event_type: str, payload: dict[str, Any], now: datetime
-    ) -> OutboxId:
+    async def append(self, *, event_type: str, payload: dict[str, Any], now: datetime) -> OutboxId:
         self.events.append((event_type, payload))
         self._seq += 1
         return OutboxId(self._seq)
@@ -353,24 +327,16 @@ class FakeModeration(IModerationRepository):
         self._by_id[case.id] = case
         return case
 
-    async def get_by_id(
-        self, case_id: ModerationCaseId
-    ) -> ModerationCase | None:
+    async def get_by_id(self, case_id: ModerationCaseId) -> ModerationCase | None:
         return self._by_id.get(case_id)
 
     async def get_open_by_fic(self, fic_id: FanficId) -> ModerationCase | None:
         for c in self._by_id.values():
-            if (
-                c.fic_id == fic_id
-                and c.decision is None
-                and c.cancelled_at is None
-            ):
+            if c.fic_id == fic_id and c.decision is None and c.cancelled_at is None:
                 return c
         return None
 
-    async def pick_next(
-        self, *, moderator_id: UserId, now: datetime
-    ) -> ModerationCase | None:
+    async def pick_next(self, *, moderator_id: UserId, now: datetime) -> ModerationCase | None:
         for c in sorted(self._by_id.values(), key=lambda x: x.submitted_at):
             if (
                 c.decision is None
@@ -390,15 +356,22 @@ class FakeModeration(IModerationRepository):
         self._by_id[case.id] = case
         return True
 
-    async def unlock(
-        self, *, case_id: ModerationCaseId, moderator_id: UserId
-    ) -> bool:
+    async def unlock(self, *, case_id: ModerationCaseId, moderator_id: UserId) -> bool:
         c = self._by_id.get(case_id)
         if c is None or c.locked_by != moderator_id:
             return False
         c.locked_by = None
         c.locked_until = None
         return True
+
+    async def release_own_locks(self, *, moderator_id: UserId) -> int:
+        released = 0
+        for c in self._by_id.values():
+            if c.decision is None and c.cancelled_at is None and c.locked_by == moderator_id:
+                c.locked_by = None
+                c.locked_until = None
+                released += 1
+        return released
 
     async def release_stale_locks(self, *, now: datetime) -> int:
         released = 0
@@ -414,9 +387,7 @@ class FakeModeration(IModerationRepository):
                 released += 1
         return released
 
-    async def mark_cancelled(
-        self, *, case_id: ModerationCaseId, now: datetime
-    ) -> bool:
+    async def mark_cancelled(self, *, case_id: ModerationCaseId, now: datetime) -> bool:
         c = self._by_id.get(case_id)
         if c is None or c.decision is not None or c.cancelled_at is not None:
             return False
@@ -450,9 +421,7 @@ class FakeReasons(IReasonRepository):
     async def list_active(self) -> list[RejectionReason]:
         return list(self._reasons)
 
-    async def get_by_ids(
-        self, reason_ids: list[ModerationReasonId]
-    ) -> list[RejectionReason]:
+    async def get_by_ids(self, reason_ids: list[ModerationReasonId]) -> list[RejectionReason]:
         return [r for r in self._reasons if r.id in reason_ids]
 
 
@@ -487,13 +456,9 @@ class FakeAudit(IAuditLog):
 class FakeNotifier(IAuthorNotifier):
     def __init__(self) -> None:
         self.approved: list[tuple[UserId, FanficId, str]] = []
-        self.rejected: list[
-            tuple[UserId, FanficId, str, list[RejectionReason], str | None]
-        ] = []
+        self.rejected: list[tuple[UserId, FanficId, str, list[RejectionReason], str | None]] = []
 
-    async def notify_approved(
-        self, *, author_id: UserId, fic_id: FanficId, fic_title: str
-    ) -> None:
+    async def notify_approved(self, *, author_id: UserId, fic_id: FanficId, fic_title: str) -> None:
         self.approved.append((author_id, fic_id, fic_title))
 
     async def notify_rejected(

@@ -97,33 +97,51 @@ def _make_approved_chapter(
 # ---------- ToggleLikeUseCase ----------
 
 
+class _FakeSearchQueue:
+    """Фейк `ISearchIndexQueue`: запоминает fic_id для последующих проверок."""
+
+    def __init__(self) -> None:
+        self.enqueued: list[int] = []
+        self.debounced: list[int] = []
+
+    async def enqueue(self, fic_id: int) -> None:
+        self.enqueued.append(int(fic_id))
+
+    async def enqueue_debounced(self, fic_id: int, ttl_s: int = 60) -> None:
+        self.debounced.append(int(fic_id))
+
+
 class TestToggleLike:
     async def test_first_call_inserts_and_increments(self, clock: FrozenClock) -> None:
         fanfics = extend_with_counters(FakeFanfics())
         await fanfics.save(_make_approved_fic())
         likes = FakeLikes()
-        uc = ToggleLikeUseCase(FakeUow(), fanfics, likes, clock)
+        search_q = _FakeSearchQueue()
+        uc = ToggleLikeUseCase(FakeUow(), fanfics, likes, search_q, clock)
         res = await uc(ToggleLikeCommand(user_id=5, fic_id=1))
         assert res.now_liked is True
         assert fanfics.likes_counts == {1: 1}
         assert await likes.exists(UserId(5), FanficId(1)) is True
+        assert search_q.debounced == [1]
 
     async def test_second_call_removes_and_decrements(self, clock: FrozenClock) -> None:
         fanfics = extend_with_counters(FakeFanfics())
         await fanfics.save(_make_approved_fic())
         likes = FakeLikes()
-        uc = ToggleLikeUseCase(FakeUow(), fanfics, likes, clock)
+        search_q = _FakeSearchQueue()
+        uc = ToggleLikeUseCase(FakeUow(), fanfics, likes, search_q, clock)
         await uc(ToggleLikeCommand(user_id=5, fic_id=1))
         res = await uc(ToggleLikeCommand(user_id=5, fic_id=1))
         assert res.now_liked is False
         assert fanfics.likes_counts == {1: 0}
+        assert search_q.debounced == [1, 1]
 
     async def test_rejects_non_approved_fic(self, clock: FrozenClock) -> None:
         fanfics = extend_with_counters(FakeFanfics())
         fic = _make_approved_fic()
         fic.status = FicStatus.DRAFT
         await fanfics.save(fic)
-        uc = ToggleLikeUseCase(FakeUow(), fanfics, FakeLikes(), clock)
+        uc = ToggleLikeUseCase(FakeUow(), fanfics, FakeLikes(), _FakeSearchQueue(), clock)
         with pytest.raises(NotFoundError):
             await uc(ToggleLikeCommand(user_id=5, fic_id=1))
 
@@ -147,37 +165,32 @@ class TestToggleBookmark:
 
 
 class TestSaveProgress:
-    async def test_first_write_succeeds_second_throttled(self, clock: FrozenClock) -> None:
+    """После отключения throttle use case ВСЕГДА сохраняет последнюю страницу.
+
+    Регрессия: раньше первый-пишет-побеждает throttle отбрасывал последующие
+    записи в пределах 5-сек окна, и «▶ Продолжить» показывал не ту страницу,
+    на которой пользователь закончил читать.
+    """
+
+    async def test_consecutive_writes_all_succeed(self, clock: FrozenClock) -> None:
         progress = FakeReadingProgress()
-        throttle = FakeProgressThrottle()
-        uc = SaveProgressUseCase(FakeUow(), progress, throttle, clock)
+        uc = SaveProgressUseCase(FakeUow(), progress, clock)
 
         ok1 = await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=3, page_no=1))
         ok2 = await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=3, page_no=2))
-        assert ok1 is True
-        assert ok2 is False
-        # В пределах той же главы throttle блокирует — сохранилась только первая.
+        ok3 = await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=3, page_no=3))
+        assert ok1 is True and ok2 is True and ok3 is True
         row = await progress.get(UserId(1), FanficId(2))
         assert row is not None
-        assert row.page_no == 1
+        assert row.page_no == 3, "Должна остаться последняя страница"
         assert int(row.chapter_id) == 3
 
-    async def test_chapter_change_bypasses_throttle(self, clock: FrozenClock) -> None:
-        """Регрессия: после перехода на другую главу запись должна пройти сразу.
-
-        Сценарий: user читает гл.1 стр.1 → переходит на гл.2 стр.1 → жмёт
-        «Главное меню» → полка предлагает «Продолжить с гл.2 стр.1»
-        (а не гл.1 стр.1, как было до фикса throttle-ключа).
-        """
+    async def test_chapter_change_writes_new_chapter(self, clock: FrozenClock) -> None:
         progress = FakeReadingProgress()
-        throttle = FakeProgressThrottle()
-        uc = SaveProgressUseCase(FakeUow(), progress, throttle, clock)
+        uc = SaveProgressUseCase(FakeUow(), progress, clock)
 
-        ok1 = await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=10, page_no=1))
-        # Сразу же — смена главы (throttle по (user, fic, chapter_id=20) — новый ключ).
-        ok2 = await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=20, page_no=1))
-        assert ok1 is True
-        assert ok2 is True, "Смена главы должна обходить throttle"
+        await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=10, page_no=1))
+        await uc(SaveProgressCommand(user_id=1, fic_id=2, chapter_id=20, page_no=1))
 
         row = await progress.get(UserId(1), FanficId(2))
         assert row is not None

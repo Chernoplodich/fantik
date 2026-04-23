@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 
 from aiogram import Bot
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
+from meilisearch_python_sdk import AsyncClient as MeiliAsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -24,6 +25,24 @@ from app.application.fanfics.ports import (
     IReferenceReader,
     ITagRepository,
 )
+from app.application.fanfics.revise_after_rejection import (
+    ReviseAfterRejectionUseCase,
+)
+from app.application.fanfics.submit_for_review import SubmitForReviewUseCase
+from app.application.fanfics.update_chapter import UpdateChapterUseCase
+from app.application.fanfics.update_fanfic import UpdateFanficUseCase
+from app.application.moderation.approve import ApproveUseCase
+from app.application.moderation.list_reasons import ListReasonsUseCase
+from app.application.moderation.pick_next import PickNextUseCase
+from app.application.moderation.ports import (
+    IAuditLog,
+    IModerationRepository,
+    IModeratorNotifier,
+    IReasonRepository,
+)
+from app.application.moderation.reject import RejectUseCase
+from app.application.moderation.release_stale_locks import ReleaseStaleLocksUseCase
+from app.application.moderation.unlock import UnlockCaseUseCase
 from app.application.reading.list_feed import ListFeedUseCase
 from app.application.reading.list_my_shelf import ListMyShelfUseCase
 from app.application.reading.mark_completed import MarkCompletedUseCase
@@ -44,24 +63,17 @@ from app.application.reading.read_page import ReadPageUseCase
 from app.application.reading.save_progress import SaveProgressUseCase
 from app.application.reading.toggle_bookmark import ToggleBookmarkUseCase
 from app.application.reading.toggle_like import ToggleLikeUseCase
-from app.application.fanfics.revise_after_rejection import (
-    ReviseAfterRejectionUseCase,
+from app.application.search.index_fanfic import IndexFanficUseCase
+from app.application.search.ports import (
+    ISearchCache,
+    ISearchDocSource,
+    ISearchFallback,
+    ISearchIndex,
+    ISearchIndexQueue,
+    ISuggestReader,
 )
-from app.application.fanfics.submit_for_review import SubmitForReviewUseCase
-from app.application.fanfics.update_chapter import UpdateChapterUseCase
-from app.application.fanfics.update_fanfic import UpdateFanficUseCase
-from app.application.moderation.approve import ApproveUseCase
-from app.application.moderation.list_reasons import ListReasonsUseCase
-from app.application.moderation.pick_next import PickNextUseCase
-from app.application.moderation.ports import (
-    IAuditLog,
-    IModerationRepository,
-    IModeratorNotifier,
-    IReasonRepository,
-)
-from app.application.moderation.reject import RejectUseCase
-from app.application.moderation.release_stale_locks import ReleaseStaleLocksUseCase
-from app.application.moderation.unlock import UnlockCaseUseCase
+from app.application.search.search import SearchUseCase
+from app.application.search.suggest import SuggestUseCase
 from app.application.tracking.ports import ITrackingRepository
 from app.application.tracking.record_event import RecordEventUseCase
 from app.application.users.agree_to_rules import AgreeToRulesUseCase
@@ -101,7 +113,14 @@ from app.infrastructure.redis.page_cache import RedisPageCache
 from app.infrastructure.redis.pool import build_redis_cache_pool
 from app.infrastructure.redis.progress_throttle import RedisProgressThrottle
 from app.infrastructure.redis.role_cache import RoleCache
+from app.infrastructure.redis.search_cache import RedisSearchCache
+from app.infrastructure.search.client import build_meili_client
+from app.infrastructure.search.document_builder import PgSearchDocSource
+from app.infrastructure.search.fallback_pg import PgFtsSearch
+from app.infrastructure.search.indexer import MeiliSearchIndex
+from app.infrastructure.search.suggest_repo import PgSuggestReader
 from app.infrastructure.tasks.repagination_queue import TaskiqRepaginationQueue
+from app.infrastructure.tasks.search_index_queue import TaskiqSearchIndexQueue
 from app.infrastructure.telegram.bot_factory import build_bot
 from app.infrastructure.telegram.mod_notifier import ModeratorNotifier
 from app.infrastructure.telegram.notifier import AuthorNotifier
@@ -209,6 +228,38 @@ class QueuesProvider(Provider):
     def repagination_queue(self) -> IRepaginationQueue:
         return TaskiqRepaginationQueue()
 
+    @provide
+    def search_index_queue(self, redis: Redis) -> ISearchIndexQueue:
+        return TaskiqSearchIndexQueue(redis)
+
+
+class SearchProvider(Provider):
+    """Meilisearch: клиент, индекс с circuit-breaker, кэш. APP-scope.
+
+    Примечание: MeiliSearchIndex держит внутреннее состояние circuit breaker'а
+    (счётчик последовательных ошибок и timestamp разомкнутого контура), поэтому
+    синглтон на процесс обязателен. Для fallback и suggest — request-scope
+    реализации в RepositoriesProvider (нужна AsyncSession).
+    """
+
+    scope = Scope.APP
+
+    @provide
+    async def meili_client(self, settings: Settings) -> AsyncIterator[MeiliAsyncClient]:
+        client = build_meili_client(settings)
+        try:
+            yield client
+        finally:
+            await client.aclose()
+
+    @provide
+    def search_index(self, client: MeiliAsyncClient) -> ISearchIndex:
+        return MeiliSearchIndex(client)
+
+    @provide
+    def search_cache(self, redis: Redis) -> ISearchCache:
+        return RedisSearchCache(redis)
+
 
 class RepositoriesProvider(Provider):
     """Репозитории — request-scope, так как нуждаются в AsyncSession."""
@@ -266,9 +317,7 @@ class RepositoriesProvider(Provider):
     # ---------- reading ----------
 
     @provide
-    def chapter_pages_repo(
-        self, session: AsyncSession
-    ) -> IChapterPagesRepository:
+    def chapter_pages_repo(self, session: AsyncSession) -> IChapterPagesRepository:
         return ChapterPagesRepository(session)
 
     @provide
@@ -280,22 +329,30 @@ class RepositoriesProvider(Provider):
         return LikesRepository(session)
 
     @provide
-    def reads_completed_repo(
-        self, session: AsyncSession
-    ) -> IReadsCompletedRepository:
+    def reads_completed_repo(self, session: AsyncSession) -> IReadsCompletedRepository:
         return ReadsCompletedRepository(session)
 
     @provide
-    def reading_progress_repo(
-        self, session: AsyncSession
-    ) -> IReadingProgressRepository:
+    def reading_progress_repo(self, session: AsyncSession) -> IReadingProgressRepository:
         return ReadingProgressRepository(session)
 
     @provide
-    def fanfic_feed_reader(
-        self, session: AsyncSession
-    ) -> IFanficFeedReader:
+    def fanfic_feed_reader(self, session: AsyncSession) -> IFanficFeedReader:
         return FanficFeedReader(session)
+
+    # ---------- search ----------
+
+    @provide
+    def search_doc_source(self, session: AsyncSession) -> ISearchDocSource:
+        return PgSearchDocSource(session)
+
+    @provide
+    def search_fallback(self, session: AsyncSession) -> ISearchFallback:
+        return PgFtsSearch(session)
+
+    @provide
+    def suggest_reader(self, session: AsyncSession) -> ISuggestReader:
+        return PgSuggestReader(session)
 
 
 class UseCasesProvider(Provider):
@@ -562,10 +619,9 @@ class UseCasesProvider(Provider):
         self,
         uow: UnitOfWork,
         progress: IReadingProgressRepository,
-        throttle: IProgressThrottle,
         clock: Clock,
     ) -> SaveProgressUseCase:
-        return SaveProgressUseCase(uow, progress, throttle, clock)
+        return SaveProgressUseCase(uow, progress, clock)
 
     @provide
     def toggle_like_uc(
@@ -573,9 +629,10 @@ class UseCasesProvider(Provider):
         uow: UnitOfWork,
         fanfics: IFanficRepository,
         likes: ILikesRepository,
+        search_queue: ISearchIndexQueue,
         clock: Clock,
     ) -> ToggleLikeUseCase:
-        return ToggleLikeUseCase(uow, fanfics, likes, clock)
+        return ToggleLikeUseCase(uow, fanfics, likes, search_queue, clock)
 
     @provide
     def toggle_bookmark_uc(
@@ -597,9 +654,7 @@ class UseCasesProvider(Provider):
         outbox: IOutboxRepository,
         clock: Clock,
     ) -> MarkCompletedUseCase:
-        return MarkCompletedUseCase(
-            uow, fanfics, chapters, reads_completed, outbox, clock
-        )
+        return MarkCompletedUseCase(uow, fanfics, chapters, reads_completed, outbox, clock)
 
     @provide
     def list_feed_uc(self, feed: IFanficFeedReader) -> ListFeedUseCase:
@@ -615,6 +670,20 @@ class UseCasesProvider(Provider):
     ) -> ListMyShelfUseCase:
         return ListMyShelfUseCase(fanfics, bookmarks, likes, progress)
 
+    # ---------- search ----------
+
+    @provide
+    def search_uc(self, primary: ISearchIndex, fallback: ISearchFallback) -> SearchUseCase:
+        return SearchUseCase(primary, fallback)
+
+    @provide
+    def suggest_uc(self, reader: ISuggestReader, cache: ISearchCache) -> SuggestUseCase:
+        return SuggestUseCase(reader, cache)
+
+    @provide
+    def index_fanfic_uc(self, source: ISearchDocSource, index: ISearchIndex) -> IndexFanficUseCase:
+        return IndexFanficUseCase(source, index)
+
 
 def build_container() -> AsyncContainer:
     """Собрать контейнер со всеми провайдерами. Вызывать один раз на процесс."""
@@ -629,6 +698,7 @@ def build_container() -> AsyncContainer:
         RedisProvider(),
         BotProvider(),
         QueuesProvider(),
+        SearchProvider(),
         RepositoriesProvider(),
         UseCasesProvider(),
         AiogramProvider(),

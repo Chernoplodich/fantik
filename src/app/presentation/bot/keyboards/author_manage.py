@@ -83,9 +83,12 @@ def build_fanfic_card_kb(fic_id: int, status: FicStatus) -> InlineKeyboardMarkup
             text="📚 Главы",
             callback_data=FanficCD(action="chapters", fic_id=fic_id_int).pack(),
         )
+        # Правка approved-фика требует повторной модерации. Первый тап — диалог
+        # с пояснением; после «Начать правку» фик уходит в REVISING и пользователь
+        # получает обычное меню правки.
         b.button(
-            text="✏️ Правка → новая версия",
-            callback_data=FanficCD(action="edit", fic_id=fic_id_int).pack(),
+            text="🔄 Внести правку",
+            callback_data=FanficCD(action="request_revise", fic_id=fic_id_int).pack(),
         )
     b.button(text="← Мои работы", callback_data="menu:my_works")
     b.adjust(1)
@@ -134,14 +137,14 @@ def build_chapter_list_kb(
     """Список глав автору с переходом на карточку главы (для управления)."""
     b = InlineKeyboardBuilder()
     for ch in chapters:
-        status_mark = "✅" if ch.status == FicStatus.APPROVED else (
-            "⏳" if ch.status == FicStatus.PENDING else "✏️"
+        status_mark = (
+            "✅"
+            if ch.status == FicStatus.APPROVED
+            else ("⏳" if ch.status == FicStatus.PENDING else "✏️")
         )
         b.button(
             text=f"{status_mark} Глава {int(ch.number)}: {str(ch.title)[:40]}",
-            callback_data=ChapterListCD(
-                fic_id=fic_id, chapter_id=int(ch.id)
-            ).pack(),
+            callback_data=ChapterListCD(fic_id=fic_id, chapter_id=int(ch.id)).pack(),
         )
     b.button(
         text="← К работе",
@@ -178,15 +181,11 @@ def build_delete_confirm_kb(*, chapter_id: int, fic_id: int) -> InlineKeyboardMa
     b = InlineKeyboardBuilder()
     b.button(
         text="🗑 Удалить безвозвратно",
-        callback_data=ChapterActionCD(
-            action="confirm_delete", chapter_id=chapter_id
-        ).pack(),
+        callback_data=ChapterActionCD(action="confirm_delete", chapter_id=chapter_id).pack(),
     )
     b.button(
         text="Отмена",
-        callback_data=ChapterActionCD(
-            action="cancel_delete", chapter_id=chapter_id
-        ).pack(),
+        callback_data=ChapterActionCD(action="cancel_delete", chapter_id=chapter_id).pack(),
     )
     b.adjust(1)
     return b.as_markup()

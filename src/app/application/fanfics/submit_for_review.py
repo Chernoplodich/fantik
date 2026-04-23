@@ -182,7 +182,7 @@ class SubmitForReviewUseCase:
                     fic_title=notify_payload[3],
                     author_id=notify_payload[4],
                 )
-            except Exception:  # noqa: BLE001 — нотификации не роллбэкают БД
+            except Exception:
                 pass
 
         return SubmitForReviewResult(

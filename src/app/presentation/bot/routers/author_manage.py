@@ -52,8 +52,8 @@ from app.application.fanfics.update_fanfic import (
     UpdateFanficUseCase,
 )
 from app.core.config import Settings
-from app.core.errors import DomainError
-from app.domain.fanfics.value_objects import FicStatus
+from app.core.errors import DomainError, ValidationError
+from app.domain.fanfics.value_objects import ChapterTitle, FicStatus
 from app.domain.shared.types import ChapterId
 from app.presentation.bot.callback_data.fanfic import (
     AgeRatingCD,
@@ -136,9 +136,7 @@ async def view_fanfic(
         return
     try:
         bundle = await get_uc(
-            GetFanficDraftCommand(
-                fic_id=callback_data.fic_id, author_id=cb.from_user.id
-            )
+            GetFanficDraftCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
@@ -178,9 +176,7 @@ async def submit_fanfic(
         return
     try:
         result = await submit_uc(
-            SubmitForReviewCommand(
-                fic_id=callback_data.fic_id, author_id=cb.from_user.id
-            )
+            SubmitForReviewCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
@@ -211,9 +207,7 @@ async def cancel_submission(
         return
     try:
         await cancel_uc(
-            CancelSubmissionCommand(
-                fic_id=callback_data.fic_id, author_id=cb.from_user.id
-            )
+            CancelSubmissionCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
@@ -238,15 +232,102 @@ async def revise_fanfic(
         return
     try:
         await revise_uc(
-            ReviseAfterRejectionCommand(
-                fic_id=callback_data.fic_id, author_id=cb.from_user.id
-            )
+            ReviseAfterRejectionCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
         return
     if cb.message is not None:
         await cb.message.answer(t("revise_success"))
+    await cb.answer()
+
+
+# ---------- Request revise (approved → confirmation → revising) ----------
+
+
+@router.callback_query(FanficCD.filter(F.action == "request_revise"))
+async def request_revise(cb: CallbackQuery, callback_data: FanficCD) -> None:
+    """Approved-фик: показать пояснение и кнопки подтверждения."""
+    if cb.message is None:
+        await cb.answer()
+        return
+    fic_id = int(callback_data.fic_id)
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    text = (
+        "ℹ️ Эта работа опубликована.\n\n"
+        "Чтобы внести изменения, нужно:\n"
+        "1. Включить режим правки (работа будет временно скрыта из каталога).\n"
+        "2. Отредактировать нужные поля или главы.\n"
+        "3. Нажать «Отправить на модерацию» — модераторы рассмотрят правки и вернут работу в каталог."
+    )
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Начать правку",
+                    callback_data=FanficCD(action="confirm_revise", fic_id=fic_id).pack(),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Отмена",
+                    callback_data=FanficCD(action="view", fic_id=fic_id).pack(),
+                ),
+            ],
+        ]
+    )
+    await cb.message.answer(text, reply_markup=kb)
+    await cb.answer()
+
+
+@router.callback_query(FanficCD.filter(F.action == "confirm_revise"))
+@inject
+async def confirm_revise(
+    cb: CallbackQuery,
+    callback_data: FanficCD,
+    revise_uc: FromDishka[ReviseAfterRejectionUseCase],
+    get_uc: FromDishka[GetFanficDraftUseCase],
+) -> None:
+    """Подтверждение: approved → revising, затем показать карточку с edit-кнопками."""
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+    try:
+        await revise_uc(
+            ReviseAfterRejectionCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
+        )
+    except DomainError as e:
+        await cb.answer(str(e) or t("error_generic"), show_alert=True)
+        return
+
+    await cb.message.answer(
+        "🔧 Режим правки включён. Работа временно скрыта из каталога.\n"
+        "Внеси изменения и нажми «Отправить на модерацию»."
+    )
+    # Показываем обновлённую карточку: теперь status=REVISING → доступны все edit-кнопки.
+    try:
+        bundle = await get_uc(
+            GetFanficDraftCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
+        )
+    except DomainError:
+        await cb.answer()
+        return
+    fic = bundle.fic
+    from html import escape as _h
+
+    await cb.message.answer(
+        t(
+            "my_works_card",
+            title=_h(str(fic.title)),
+            status=fic.status.value,
+            chapters=fic.chapters_count,
+            updated=fic.updated_at.strftime("%Y-%m-%d %H:%M") if fic.updated_at else "—",
+            summary=_h(str(fic.summary)),
+        ),
+        parse_mode="HTML",
+        reply_markup=build_fanfic_card_kb(int(fic.id), fic.status),
+    )
     await cb.answer()
 
 
@@ -271,7 +352,12 @@ async def add_chapter_title(message: Message, state: FSMContext) -> None:
     if not message.text:
         await message.answer(t("fic_expect_text"))
         return
-    await state.update_data(chapter_title=message.text)
+    try:
+        ch_title = ChapterTitle(message.text)
+    except ValidationError as e:
+        await message.answer(str(e))
+        return
+    await state.update_data(chapter_title=str(ch_title))
     await reset_buffer(state)
     await state.set_state(AddChapterStates.waiting_text)
     await message.answer(t("fic_create_chapter_text_prompt", max_chars=100_000))
@@ -372,9 +458,7 @@ async def _show_edit_menu(
     if cb.from_user is None or cb.message is None:
         return
     try:
-        bundle = await get_uc(
-            GetFanficDraftCommand(fic_id=fic_id, author_id=cb.from_user.id)
-        )
+        bundle = await get_uc(GetFanficDraftCommand(fic_id=fic_id, author_id=cb.from_user.id))
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
         return
@@ -396,9 +480,7 @@ async def _show_edit_menu(
     await cb.message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=build_edit_menu_kb(
-            fic_id=fic_id, has_cover=fic.cover_file_id is not None
-        ),
+        reply_markup=build_edit_menu_kb(fic_id=fic_id, has_cover=fic.cover_file_id is not None),
     )
 
 
@@ -437,9 +519,7 @@ async def _apply_update(
 ) -> bool:
     """Загружает фик, пересобирает UpdateFanficCommand, подменяя поля из overrides."""
     try:
-        bundle = await get_uc(
-            GetFanficDraftCommand(fic_id=fic_id, author_id=author_id)
-        )
+        bundle = await get_uc(GetFanficDraftCommand(fic_id=fic_id, author_id=author_id))
     except DomainError as e:
         await _answer(cb, str(e) or t("error_generic"), alert=True)
         return False
@@ -456,9 +536,7 @@ async def _apply_update(
         age_rating_id=overrides.get("age_rating_id", int(fic.age_rating_id)),
         tag_raws=overrides.get("tag_raws", current_tag_names),
         cover_file_id=overrides.get("cover_file_id", fic.cover_file_id),
-        cover_file_unique_id=overrides.get(
-            "cover_file_unique_id", fic.cover_file_unique_id
-        ),
+        cover_file_unique_id=overrides.get("cover_file_unique_id", fic.cover_file_unique_id),
     )
     try:
         await update_uc(cmd)
@@ -567,9 +645,7 @@ async def edit_summary_value(
 
 
 @router.callback_query(EditFieldCD.filter(F.field == "tags"))
-async def edit_field_tags(
-    cb: CallbackQuery, callback_data: EditFieldCD, state: FSMContext
-) -> None:
+async def edit_field_tags(cb: CallbackQuery, callback_data: EditFieldCD, state: FSMContext) -> None:
     await state.set_state(EditFanficStates.waiting_tags)
     await state.update_data(fic_id=callback_data.fic_id)
     if cb.message is not None:
@@ -629,16 +705,12 @@ async def edit_field_fandom(
     if cb.message is not None:
         await cb.message.answer(
             t("edit_prompt_fandom"),
-            reply_markup=build_fandom_picker_kb(
-                fandoms=fandoms, page=0, total=total
-            ),
+            reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=0, total=total),
         )
     await cb.answer()
 
 
-@router.callback_query(
-    EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page")
-)
+@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page"))
 @inject
 async def edit_fandom_page(
     cb: CallbackQuery,
@@ -654,16 +726,12 @@ async def edit_fandom_page(
         active_only=True,
     )
     await cb.message.edit_reply_markup(
-        reply_markup=build_fandom_picker_kb(
-            fandoms=fandoms, page=callback_data.page, total=total
-        )
+        reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=callback_data.page, total=total)
     )
     await cb.answer()
 
 
-@router.callback_query(
-    EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick")
-)
+@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick"))
 @inject
 async def edit_fandom_pick(
     cb: CallbackQuery,
@@ -693,9 +761,7 @@ async def edit_fandom_pick(
     if cb.message is not None:
         await cb.message.answer(t("edit_done"))
     await state.set_state(EditFanficStates.selecting_field)
-    await _show_edit_menu(
-        cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference
-    )
+    await _show_edit_menu(cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference)
     await cb.answer()
 
 
@@ -748,9 +814,7 @@ async def edit_age_rating_pick(
     if cb.message is not None:
         await cb.message.answer(t("edit_done"))
     await state.set_state(EditFanficStates.selecting_field)
-    await _show_edit_menu(
-        cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference
-    )
+    await _show_edit_menu(cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference)
     await cb.answer()
 
 
@@ -834,9 +898,7 @@ async def edit_cover_clear(
     if cb.message is not None:
         await cb.message.answer(t("edit_cover_cleared"))
     await state.set_state(EditFanficStates.selecting_field)
-    await _show_edit_menu(
-        cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference
-    )
+    await _show_edit_menu(cb, fic_id=fic_id, get_uc=get_uc, tags=tags_repo, reference=reference)
     await cb.answer()
 
 
@@ -851,9 +913,7 @@ async def _send_menu_as_message(
     if message.from_user is None:
         return
     try:
-        bundle = await get_uc(
-            GetFanficDraftCommand(fic_id=fic_id, author_id=message.from_user.id)
-        )
+        bundle = await get_uc(GetFanficDraftCommand(fic_id=fic_id, author_id=message.from_user.id))
     except DomainError:
         return
     fic = bundle.fic
@@ -872,9 +932,7 @@ async def _send_menu_as_message(
             cover="✓" if fic.cover_file_id else "—",
         ),
         parse_mode="HTML",
-        reply_markup=build_edit_menu_kb(
-            fic_id=fic_id, has_cover=fic.cover_file_id is not None
-        ),
+        reply_markup=build_edit_menu_kb(fic_id=fic_id, has_cover=fic.cover_file_id is not None),
     )
 
 
@@ -895,9 +953,7 @@ async def chapters_list(
         return
     try:
         bundle = await get_uc(
-            GetFanficDraftCommand(
-                fic_id=callback_data.fic_id, author_id=cb.from_user.id
-            )
+            GetFanficDraftCommand(fic_id=callback_data.fic_id, author_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e) or t("error_generic"), show_alert=True)
@@ -986,9 +1042,7 @@ async def chapter_edit_start(
         return
     await state.clear()
     await state.set_state(EditChapterStates.waiting_title)
-    await state.update_data(
-        chapter_id=int(ch.id), fic_id=int(ch.fic_id)
-    )
+    await state.update_data(chapter_id=int(ch.id), fic_id=int(ch.fic_id))
     if cb.message is not None:
         await cb.message.answer(t("chapter_edit_title_prompt"))
     await cb.answer()
@@ -999,7 +1053,12 @@ async def chapter_edit_title(message: Message, state: FSMContext) -> None:
     if not message.text:
         await message.answer(t("fic_expect_text"))
         return
-    await state.update_data(chapter_title=message.text)
+    try:
+        ch_title = ChapterTitle(message.text)
+    except ValidationError as e:
+        await message.answer(str(e))
+        return
+    await state.update_data(chapter_title=str(ch_title))
     await reset_buffer(state)
     await state.set_state(EditChapterStates.waiting_text)
     await message.answer(t("chapter_edit_text_prompt"))
@@ -1108,9 +1167,7 @@ async def chapter_delete_prompt(
                 title=_h(str(ch.title)),
             ),
             parse_mode="HTML",
-            reply_markup=build_delete_confirm_kb(
-                chapter_id=int(ch.id), fic_id=int(ch.fic_id)
-            ),
+            reply_markup=build_delete_confirm_kb(chapter_id=int(ch.id), fic_id=int(ch.fic_id)),
         )
     await cb.answer()
 
@@ -1149,9 +1206,7 @@ async def chapter_delete_confirm(
 
 
 @router.callback_query(ChapterActionCD.filter(F.action == "cancel_delete"))
-async def chapter_delete_cancel(
-    cb: CallbackQuery, callback_data: ChapterActionCD
-) -> None:
+async def chapter_delete_cancel(cb: CallbackQuery, callback_data: ChapterActionCD) -> None:
     if cb.message is not None:
         await cb.message.answer(t("chapter_delete_cancelled"))
     await cb.answer()
