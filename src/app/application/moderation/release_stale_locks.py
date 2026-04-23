@@ -24,8 +24,6 @@ class ReleaseStaleLocksUseCase:
 
     async def __call__(self) -> int:
         async with self._uow:
-            released = await self._moderation.release_stale_locks(
-                now=self._clock.now()
-            )
+            released = await self._moderation.release_stale_locks(now=self._clock.now())
             await self._uow.commit()
         return released

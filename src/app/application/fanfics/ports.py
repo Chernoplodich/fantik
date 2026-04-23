@@ -27,6 +27,7 @@ from app.domain.shared.types import (
 
 # ---------- DTO / read-models ----------
 
+
 @dataclass(frozen=True, kw_only=True)
 class FandomRef:
     id: FandomId
@@ -71,6 +72,7 @@ class FanficWithChapters:
 
 
 # ---------- Repositories ----------
+
 
 class IFanficRepository(Protocol):
     async def get(self, fic_id: FanficId) -> Fanfic | None: ...
@@ -121,9 +123,7 @@ class IChapterRepository(Protocol):
 
 
 class ITagRepository(Protocol):
-    async def ensure(
-        self, *, name: TagName, slug: TagSlug, kind: str
-    ) -> tuple[TagRef, bool]:
+    async def ensure(self, *, name: TagName, slug: TagSlug, kind: str) -> tuple[TagRef, bool]:
         """Idempotent upsert. Возвращает (ref, created)."""
         ...
 

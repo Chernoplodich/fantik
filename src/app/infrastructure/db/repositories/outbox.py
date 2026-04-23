@@ -16,9 +16,7 @@ class OutboxRepository(IOutboxRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    async def append(
-        self, *, event_type: str, payload: dict[str, Any], now: datetime
-    ) -> OutboxId:
+    async def append(self, *, event_type: str, payload: dict[str, Any], now: datetime) -> OutboxId:
         m = OutboxModel(
             event_type=event_type,
             payload=dict(payload),

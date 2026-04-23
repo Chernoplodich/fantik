@@ -57,9 +57,7 @@ class ModerationQueue(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision: Mapped[MqDecision | None] = mapped_column(
         Enum(
             MqDecision,
@@ -85,9 +83,5 @@ class ModerationQueue(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    decided_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    cancelled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

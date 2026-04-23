@@ -54,9 +54,7 @@ class FanficTitle(str):
             raise ValidationError("title must be a string")
         cleaned = " ".join(value.split())
         if not (TITLE_MIN <= len(cleaned) <= TITLE_MAX):
-            raise ValidationError(
-                f"Заголовок: {TITLE_MIN}–{TITLE_MAX} символов."
-            )
+            raise ValidationError(f"Заголовок: {TITLE_MIN}–{TITLE_MAX} символов.")
         return super().__new__(cls, cleaned)
 
 
@@ -70,9 +68,7 @@ class Summary(str):
             raise ValidationError("summary must be a string")
         cleaned = value.strip()
         if not (SUMMARY_MIN <= len(cleaned) <= SUMMARY_MAX):
-            raise ValidationError(
-                f"Аннотация: {SUMMARY_MIN}–{SUMMARY_MAX} символов."
-            )
+            raise ValidationError(f"Аннотация: {SUMMARY_MIN}–{SUMMARY_MAX} символов.")
         return super().__new__(cls, cleaned)
 
 
@@ -120,9 +116,7 @@ class TagName(str):
             raise ValidationError("tag name must be a string")
         cleaned = " ".join(value.split())
         if not _TAG_NAME_INNER_RE.fullmatch(cleaned):
-            raise ValidationError(
-                f"Тег: {TAG_NAME_MIN}–{TAG_NAME_MAX} символов."
-            )
+            raise ValidationError(f"Тег: {TAG_NAME_MIN}–{TAG_NAME_MAX} символов.")
         return super().__new__(cls, cleaned)
 
 

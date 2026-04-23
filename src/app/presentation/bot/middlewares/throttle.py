@@ -41,9 +41,7 @@ class ThrottleMiddleware(BaseMiddleware):
             # rate = cap / 60 сек → ~капля в 2 секунды при cap=30
             rate = settings.max_user_updates_per_min / 60.0
             capacity = settings.max_user_updates_per_min
-            wait = await bucket.try_acquire(
-                f"throttle:{from_user.id}", rate, capacity
-            )
+            wait = await bucket.try_acquire(f"throttle:{from_user.id}", rate, capacity)
 
         if wait == 0.0:
             return await handler(event, data)

@@ -52,9 +52,7 @@ class CancelSubmissionUseCase:
             if case is None:
                 raise NotFoundError("Открытое задание на модерацию не найдено.")
             if case.is_locked(now=now):
-                raise CaseBeingReviewedError(
-                    "Работу уже смотрит модератор. Попробуй позже."
-                )
+                raise CaseBeingReviewedError("Работу уже смотрит модератор. Попробуй позже.")
 
             # перевод глав pending → draft
             pending_chapters = await self._chapters.list_by_fic_and_statuses(

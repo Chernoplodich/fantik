@@ -26,9 +26,7 @@ class TagRepository(ITagRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    async def ensure(
-        self, *, name: TagName, slug: TagSlug, kind: str
-    ) -> tuple[TagRef, bool]:
+    async def ensure(self, *, name: TagName, slug: TagSlug, kind: str) -> tuple[TagRef, bool]:
         """INSERT ... ON CONFLICT (slug) DO UPDATE SET name=tags.name RETURNING *.
 
         UPDATE на то же значение — чтобы RETURNING гарантированно вернул строку.
@@ -42,9 +40,7 @@ class TagRepository(ITagRepository):
             RETURNING id, name, slug, kind, approved_at, (xmax = 0) AS inserted
             """
         )
-        result = await self._s.execute(
-            stmt, {"name": str(name), "slug": str(slug), "kind": kind}
-        )
+        result = await self._s.execute(stmt, {"name": str(name), "slug": str(slug), "kind": kind})
         row = result.one()
         ref = TagRef(
             id=TagId(row.id),
@@ -65,9 +61,7 @@ class TagRepository(ITagRepository):
         )
         return [_to_ref(m) for m in (await self._s.execute(stmt)).scalars()]
 
-    async def list_by_fic_ids(
-        self, fic_ids: list[FanficId]
-    ) -> dict[FanficId, list[TagRef]]:
+    async def list_by_fic_ids(self, fic_ids: list[FanficId]) -> dict[FanficId, list[TagRef]]:
         if not fic_ids:
             return {}
         stmt = (
@@ -81,12 +75,8 @@ class TagRepository(ITagRepository):
             result[FanficId(fid)].append(_to_ref(m))
         return result
 
-    async def replace_for_fic(
-        self, *, fic_id: FanficId, tag_ids: list[TagId]
-    ) -> None:
-        await self._s.execute(
-            delete(FanficTagModel).where(FanficTagModel.fic_id == int(fic_id))
-        )
+    async def replace_for_fic(self, *, fic_id: FanficId, tag_ids: list[TagId]) -> None:
+        await self._s.execute(delete(FanficTagModel).where(FanficTagModel.fic_id == int(fic_id)))
         for tid in dict.fromkeys(tag_ids):  # dedup сохраняя порядок
             self._s.add(FanficTagModel(fic_id=int(fic_id), tag_id=int(tid)))
         await self._s.flush()

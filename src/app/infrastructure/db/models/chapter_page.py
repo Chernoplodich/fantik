@@ -25,9 +25,7 @@ class ChapterPage(Base):
     entities: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
-    chars_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0"
-    )
+    chars_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     __table_args__ = (
         UniqueConstraint("chapter_id", "page_no", name="uq_chapter_pages_chapter_id_page_no"),

@@ -19,7 +19,9 @@ class Fandom(BigIntPkMixin, Base):
     aliases: Mapped[list[str]] = mapped_column(
         ARRAY(String(128)), default=list, server_default="{}", nullable=False
     )
-    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

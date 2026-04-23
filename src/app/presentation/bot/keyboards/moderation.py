@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.domain.moderation.value_objects import RejectionReason
 from app.presentation.bot.callback_data.moderation import ModCD, ReasonCD
+from app.presentation.bot.keyboards.social import mod_reports_menu_button
 
 _NOOP = "noop"
 
@@ -18,6 +19,8 @@ def _btn(text: str, callback_data: str) -> InlineKeyboardButton:
 def build_mod_menu_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="🎯 Следующая работа", callback_data=ModCD(action="pick").pack())
+    reports_btn = mod_reports_menu_button()
+    b.button(text=reports_btn.text, callback_data=reports_btn.callback_data or "noop")
     b.button(text="← Главное меню", callback_data="menu:back")
     b.adjust(1)
     return b.as_markup()

@@ -45,9 +45,7 @@ class RecordEventUseCase:
         """Возвращает True, если событие было записано."""
         uid = UserId(cmd.user_id)
         async with self._uow:
-            if cmd.only_once and await self._tracking.has_event_for_user(
-                uid, cmd.event_type.value
-            ):
+            if cmd.only_once and await self._tracking.has_event_for_user(uid, cmd.event_type.value):
                 return False
             user = await self._users.get(uid)
             if user is None:

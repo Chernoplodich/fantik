@@ -94,6 +94,12 @@ class ApproveUseCase:
             pending_chapters = await self._chapters.list_by_fic_and_statuses(
                 fic.id, [FicStatus.PENDING]
             )
+            # Отделяем «новые» главы (раньше никогда не одобрялись) от правок
+            # уже одобренных — до мутации, т.к. approve() проставит
+            # first_approved_at и обе группы в итоге будут иметь значение.
+            new_chapter_ids = [
+                int(ch.id) for ch in pending_chapters if not ch.was_previously_approved()
+            ]
             for ch in pending_chapters:
                 ch.approve(now=now)
                 await self._chapters.save(ch)
@@ -129,6 +135,13 @@ class ApproveUseCase:
                     "first_publish": was_first_publish,
                     "version_id": int(version_id),
                     "chapter_ids": approved_chapter_ids,
+                    # kind модерационного кейса — справочно (диспетчер больше
+                    # не опирается на него для fanout-решений).
+                    "kind": case.kind.value,
+                    # Главы, которые одобрены впервые — по ним шлём fanout
+                    # подписчикам автора. При fic_first_publish поле пустое:
+                    # там fanout определяется флагом first_publish.
+                    "new_chapter_ids": new_chapter_ids,
                 },
                 now=now,
             )

@@ -71,9 +71,7 @@ class RejectUseCase:
         moderator_id = UserId(cmd.moderator_id)
 
         if not cmd.reason_ids:
-            raise ReasonsRequiredForRejectError(
-                "Выбери хотя бы одну причину отказа."
-            )
+            raise ReasonsRequiredForRejectError("Выбери хотя бы одну причину отказа.")
         comment = (cmd.comment or "").strip() or None
         if comment is not None and len(comment) > REJECT_COMMENT_MAX:
             raise ReasonsRequiredForRejectError(

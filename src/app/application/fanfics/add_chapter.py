@@ -101,9 +101,7 @@ class AddChapterUseCase:
             )
             chapter = await self._chapters.save(chapter)
             fic.bump_chapters(chars_delta=chars)
-            fic.announce_chapter_added(
-                chapter_id=ChapterId(int(chapter.id)), number=int(number)
-            )
+            fic.announce_chapter_added(chapter_id=ChapterId(int(chapter.id)), number=int(number))
             await self._fanfics.save(fic)
 
             events = fic.pull_events() + chapter.pull_events()

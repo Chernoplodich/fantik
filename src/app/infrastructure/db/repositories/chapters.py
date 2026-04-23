@@ -52,9 +52,7 @@ class ChapterRepository(IChapterRepository):
             .where(ChapterModel.fic_id == int(fic_id))
             .order_by(ChapterModel.number.asc())
         )
-        return [
-            chapter_to_domain(r) for r in (await self._s.execute(stmt)).scalars()
-        ]
+        return [chapter_to_domain(r) for r in (await self._s.execute(stmt)).scalars()]
 
     async def list_by_fic_and_statuses(
         self, fic_id: FanficId, statuses: list[FicStatus]
@@ -69,20 +67,14 @@ class ChapterRepository(IChapterRepository):
             )
             .order_by(ChapterModel.number.asc())
         )
-        return [
-            chapter_to_domain(r) for r in (await self._s.execute(stmt)).scalars()
-        ]
+        return [chapter_to_domain(r) for r in (await self._s.execute(stmt)).scalars()]
 
     async def delete(self, chapter_id: ChapterId) -> None:
-        await self._s.execute(
-            delete(ChapterModel).where(ChapterModel.id == int(chapter_id))
-        )
+        await self._s.execute(delete(ChapterModel).where(ChapterModel.id == int(chapter_id)))
         await self._s.flush()
 
     async def count_by_fic(self, fic_id: FanficId) -> int:
-        stmt = select(func.count(ChapterModel.id)).where(
-            ChapterModel.fic_id == int(fic_id)
-        )
+        stmt = select(func.count(ChapterModel.id)).where(ChapterModel.fic_id == int(fic_id))
         return int((await self._s.execute(stmt)).scalar_one())
 
     async def next_number(self, fic_id: FanficId) -> int:

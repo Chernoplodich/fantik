@@ -12,11 +12,39 @@ from app.core.errors import ValidationError
 from app.domain.fanfics.value_objects import TAG_SLUG_MAX, TagName, TagSlug
 
 _CYRILLIC_MAP: dict[str, str] = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
-    "ж": "zh", "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m",
-    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-    "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
-    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "e",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "i",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "kh",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "shch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
 }
 
 
@@ -47,7 +75,5 @@ def normalize(raw: str) -> tuple[TagName, TagSlug]:
     name = TagName(raw)
     slug = _to_slug(str(name))
     if not slug:
-        raise ValidationError(
-            "Не удалось построить slug тега. Используй буквы/цифры."
-        )
+        raise ValidationError("Не удалось построить slug тега. Используй буквы/цифры.")
     return name, TagSlug(slug)

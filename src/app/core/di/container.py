@@ -72,8 +72,22 @@ from app.application.search.ports import (
     ISearchIndexQueue,
     ISuggestReader,
 )
+from app.application.reports.create_report import CreateReportUseCase
+from app.application.reports.handle_report import HandleReportUseCase
+from app.application.reports.list_open_reports import ListOpenReportsUseCase
+from app.application.reports.ports import IReportRepository
 from app.application.search.search import SearchUseCase
 from app.application.search.suggest import SuggestUseCase
+from app.application.subscriptions.notify_subscribers import (
+    NotifySubscribersUseCase,
+)
+from app.application.subscriptions.ports import (
+    INotificationQueue,
+    INotificationRepository,
+    ISubscriptionRepository,
+)
+from app.application.subscriptions.subscribe import SubscribeUseCase
+from app.application.subscriptions.unsubscribe import UnsubscribeUseCase
 from app.application.tracking.ports import ITrackingRepository
 from app.application.tracking.record_event import RecordEventUseCase
 from app.application.users.agree_to_rules import AgreeToRulesUseCase
@@ -97,6 +111,9 @@ from app.infrastructure.db.repositories.fanfics import FanficRepository
 from app.infrastructure.db.repositories.likes import LikesRepository
 from app.infrastructure.db.repositories.moderation import ModerationRepository
 from app.infrastructure.db.repositories.moderation_reasons import ReasonRepository
+from app.infrastructure.db.repositories.notifications import (
+    NotificationRepository,
+)
 from app.infrastructure.db.repositories.outbox import OutboxRepository
 from app.infrastructure.db.repositories.reading_progress import (
     ReadingProgressRepository,
@@ -105,6 +122,10 @@ from app.infrastructure.db.repositories.reads_completed import (
     ReadsCompletedRepository,
 )
 from app.infrastructure.db.repositories.reference import ReferenceReader
+from app.infrastructure.db.repositories.reports import ReportRepository
+from app.infrastructure.db.repositories.subscriptions import (
+    SubscriptionRepository,
+)
 from app.infrastructure.db.repositories.tags import TagRepository
 from app.infrastructure.db.repositories.tracking import TrackingRepository
 from app.infrastructure.db.repositories.users import UserRepository
@@ -119,6 +140,8 @@ from app.infrastructure.search.document_builder import PgSearchDocSource
 from app.infrastructure.search.fallback_pg import PgFtsSearch
 from app.infrastructure.search.indexer import MeiliSearchIndex
 from app.infrastructure.search.suggest_repo import PgSuggestReader
+from app.infrastructure.redis.token_bucket import TokenBucket
+from app.infrastructure.tasks.notification_queue import TaskiqNotificationQueue
 from app.infrastructure.tasks.repagination_queue import TaskiqRepaginationQueue
 from app.infrastructure.tasks.search_index_queue import TaskiqSearchIndexQueue
 from app.infrastructure.telegram.bot_factory import build_bot
@@ -232,6 +255,14 @@ class QueuesProvider(Provider):
     def search_index_queue(self, redis: Redis) -> ISearchIndexQueue:
         return TaskiqSearchIndexQueue(redis)
 
+    @provide
+    def notification_queue(self) -> INotificationQueue:
+        return TaskiqNotificationQueue()
+
+    @provide
+    def token_bucket(self, redis: Redis) -> TokenBucket:
+        return TokenBucket(redis)
+
 
 class SearchProvider(Provider):
     """Meilisearch: клиент, индекс с circuit-breaker, кэш. APP-scope.
@@ -339,6 +370,20 @@ class RepositoriesProvider(Provider):
     @provide
     def fanfic_feed_reader(self, session: AsyncSession) -> IFanficFeedReader:
         return FanficFeedReader(session)
+
+    # ---------- social ----------
+
+    @provide
+    def subscription_repo(self, session: AsyncSession) -> ISubscriptionRepository:
+        return SubscriptionRepository(session)
+
+    @provide
+    def notification_repo(self, session: AsyncSession) -> INotificationRepository:
+        return NotificationRepository(session)
+
+    @provide
+    def report_repo(self, session: AsyncSession) -> IReportRepository:
+        return ReportRepository(session)
 
     # ---------- search ----------
 
@@ -683,6 +728,71 @@ class UseCasesProvider(Provider):
     @provide
     def index_fanfic_uc(self, source: ISearchDocSource, index: ISearchIndex) -> IndexFanficUseCase:
         return IndexFanficUseCase(source, index)
+
+    # ---------- subscriptions ----------
+
+    @provide
+    def subscribe_uc(
+        self,
+        uow: UnitOfWork,
+        subs: ISubscriptionRepository,
+        fanfics: IFanficRepository,
+        clock: Clock,
+    ) -> SubscribeUseCase:
+        return SubscribeUseCase(uow, subs, fanfics, clock)
+
+    @provide
+    def unsubscribe_uc(
+        self,
+        uow: UnitOfWork,
+        subs: ISubscriptionRepository,
+        fanfics: IFanficRepository,
+    ) -> UnsubscribeUseCase:
+        return UnsubscribeUseCase(uow, subs, fanfics)
+
+    @provide
+    def notify_subscribers_uc(
+        self,
+        uow: UnitOfWork,
+        subs: ISubscriptionRepository,
+        notifs: INotificationRepository,
+        fanfics: IFanficRepository,
+        chapters: IChapterRepository,
+        notif_queue: INotificationQueue,
+        clock: Clock,
+    ) -> NotifySubscribersUseCase:
+        return NotifySubscribersUseCase(uow, subs, notifs, fanfics, chapters, notif_queue, clock)
+
+    # ---------- reports ----------
+
+    @provide
+    def create_report_uc(
+        self,
+        uow: UnitOfWork,
+        reports: IReportRepository,
+        fanfics: IFanficRepository,
+        chapters: IChapterRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> CreateReportUseCase:
+        return CreateReportUseCase(uow, reports, fanfics, chapters, outbox, audit, clock)
+
+    @provide
+    def handle_report_uc(
+        self,
+        uow: UnitOfWork,
+        reports: IReportRepository,
+        fanfics: IFanficRepository,
+        outbox: IOutboxRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> HandleReportUseCase:
+        return HandleReportUseCase(uow, reports, fanfics, outbox, audit, clock)
+
+    @provide
+    def list_open_reports_uc(self, reports: IReportRepository) -> ListOpenReportsUseCase:
+        return ListOpenReportsUseCase(reports)
 
 
 def build_container() -> AsyncContainer:

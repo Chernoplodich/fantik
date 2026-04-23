@@ -24,13 +24,9 @@ class ReasonRepository(IReasonRepository):
             .where(ReasonModel.active.is_(True))
             .order_by(ReasonModel.sort_order.asc(), ReasonModel.id.asc())
         )
-        return [
-            reason_to_domain(m) for m in (await self._s.execute(stmt)).scalars()
-        ]
+        return [reason_to_domain(m) for m in (await self._s.execute(stmt)).scalars()]
 
-    async def get_by_ids(
-        self, reason_ids: list[ModerationReasonId]
-    ) -> list[RejectionReason]:
+    async def get_by_ids(self, reason_ids: list[ModerationReasonId]) -> list[RejectionReason]:
         if not reason_ids:
             return []
         stmt = (
@@ -38,6 +34,4 @@ class ReasonRepository(IReasonRepository):
             .where(ReasonModel.id.in_([int(i) for i in reason_ids]))
             .order_by(ReasonModel.sort_order.asc(), ReasonModel.id.asc())
         )
-        return [
-            reason_to_domain(m) for m in (await self._s.execute(stmt)).scalars()
-        ]
+        return [reason_to_domain(m) for m in (await self._s.execute(stmt)).scalars()]

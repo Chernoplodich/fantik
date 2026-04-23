@@ -24,6 +24,7 @@ from app.infrastructure.db.models.fanfic import Fanfic as FanficModel
 
 # ---------- Fanfic ----------
 
+
 def fanfic_to_domain(m: FanficModel) -> FanficEntity:
     return FanficEntity(
         id=FanficId(m.id),
@@ -37,9 +38,7 @@ def fanfic_to_domain(m: FanficModel) -> FanficEntity:
         age_rating_id=int(m.age_rating_id),
         status=FicStatus(m.status),
         current_version_id=(
-            FanficVersionId(m.current_version_id)
-            if m.current_version_id is not None
-            else None
+            FanficVersionId(m.current_version_id) if m.current_version_id is not None else None
         ),
         chapters_count=int(m.chapters_count),
         chars_count=int(m.chars_count),
@@ -61,9 +60,7 @@ def apply_fanfic_to_model(m: FanficModel, e: FanficEntity) -> None:
     m.fandom_id = int(e.fandom_id)
     m.age_rating_id = int(e.age_rating_id)
     m.status = e.status
-    m.current_version_id = (
-        int(e.current_version_id) if e.current_version_id is not None else None
-    )
+    m.current_version_id = int(e.current_version_id) if e.current_version_id is not None else None
     m.chapters_count = int(e.chapters_count)
     m.chars_count = int(e.chars_count)
     m.first_published_at = e.first_published_at
@@ -95,6 +92,7 @@ def new_fanfic_model(e: FanficEntity) -> FanficModel:
 
 # ---------- Chapter ----------
 
+
 def chapter_to_domain(m: ChapterModel) -> ChapterEntity:
     return ChapterEntity(
         id=ChapterId(m.id),
@@ -107,6 +105,7 @@ def chapter_to_domain(m: ChapterModel) -> ChapterEntity:
         status=FicStatus(m.status),
         created_at=m.created_at,
         updated_at=m.updated_at,
+        first_approved_at=m.first_approved_at,
     )
 
 
@@ -118,6 +117,7 @@ def apply_chapter_to_model(m: ChapterModel, e: ChapterEntity) -> None:
     m.entities = list(e.entities)
     m.chars_count = int(e.chars_count)
     m.status = e.status
+    m.first_approved_at = e.first_approved_at
 
 
 def new_chapter_model(e: ChapterEntity) -> ChapterModel:
@@ -129,4 +129,5 @@ def new_chapter_model(e: ChapterEntity) -> ChapterModel:
         entities=list(e.entities),
         chars_count=int(e.chars_count),
         status=e.status,
+        first_approved_at=e.first_approved_at,
     )

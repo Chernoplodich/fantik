@@ -73,9 +73,7 @@ async def _submit_fic(clock: FrozenClock) -> dict:
     )
     add_ch = AddChapterUseCase(FakeUow(), fanfics, chapters, clock, settings)
     await add_ch(
-        AddChapterCommand(
-            fic_id=draft.fic_id, author_id=1, title="Ch1", text="text", entities=[]
-        )
+        AddChapterCommand(fic_id=draft.fic_id, author_id=1, title="Ch1", text="text", entities=[])
     )
     submit = SubmitForReviewUseCase(
         FakeUow(),

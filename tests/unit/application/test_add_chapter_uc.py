@@ -108,19 +108,9 @@ class TestAddChapter:
             max_chapter_chars = settings.max_chapter_chars
 
         uc = AddChapterUseCase(FakeUow(), fanfics, chapters, clock, S())  # type: ignore[arg-type]
-        await uc(
-            AddChapterCommand(
-                fic_id=fic_id, author_id=1, title="A", text="x", entities=[]
-            )
-        )
-        await uc(
-            AddChapterCommand(
-                fic_id=fic_id, author_id=1, title="B", text="y", entities=[]
-            )
-        )
+        await uc(AddChapterCommand(fic_id=fic_id, author_id=1, title="A", text="x", entities=[]))
+        await uc(AddChapterCommand(fic_id=fic_id, author_id=1, title="B", text="y", entities=[]))
         with pytest.raises(FanficChapterLimitExceededError):
             await uc(
-                AddChapterCommand(
-                    fic_id=fic_id, author_id=1, title="C", text="z", entities=[]
-                )
+                AddChapterCommand(fic_id=fic_id, author_id=1, title="C", text="z", entities=[])
             )

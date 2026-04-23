@@ -31,9 +31,7 @@ class FanficRepository(IFanficRepository):
         row = await self._s.get(FanficModel, int(fic_id))
         return fanfic_to_domain(row) if row else None
 
-    async def get_with_chapters(
-        self, fic_id: FanficId
-    ) -> FanficWithChapters | None:
+    async def get_with_chapters(self, fic_id: FanficId) -> FanficWithChapters | None:
         m = await self._s.get(FanficModel, int(fic_id))
         if m is None:
             return None
@@ -100,9 +98,7 @@ class FanficRepository(IFanficRepository):
         ]
         return items, total
 
-    async def count_submitted_today(
-        self, *, author_id: UserId, tz: str
-    ) -> int:
+    async def count_submitted_today(self, *, author_id: UserId, tz: str) -> int:
         stmt = text(
             """
             SELECT COUNT(*) FROM fanfics

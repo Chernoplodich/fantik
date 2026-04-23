@@ -73,15 +73,9 @@ class FakeUsers(IUserRepository):
         u = self._by_id.get(user_id)
         return u.role.value if u else None
 
-    async def is_nick_taken(
-        self, nick_lower: str, *, except_user_id: UserId | None = None
-    ) -> bool:
+    async def is_nick_taken(self, nick_lower: str, *, except_user_id: UserId | None = None) -> bool:
         for u in self._by_id.values():
-            if (
-                u.author_nick
-                and u.author_nick.lowered == nick_lower
-                and u.id != except_user_id
-            ):
+            if u.author_nick and u.author_nick.lowered == nick_lower and u.id != except_user_id:
                 return True
         return False
 
@@ -123,9 +117,7 @@ class FakeTracking(ITrackingRepository):
         self._events.append(event)
 
     async def has_event_for_user(self, user_id: UserId, event_type: str) -> bool:
-        return any(
-            e.user_id == user_id and e.event_type.value == event_type for e in self._events
-        )
+        return any(e.user_id == user_id and e.event_type.value == event_type for e in self._events)
 
     @property
     def events(self) -> list[TrackingEvent]:

@@ -49,11 +49,7 @@ class ReferenceReader(IReferenceReader):
             total_stmt = total_stmt.where(FandomModel.active.is_(True))
             main_stmt = main_stmt.where(FandomModel.active.is_(True))
         total = int((await self._s.execute(total_stmt)).scalar_one())
-        rows = (
-            (await self._s.execute(main_stmt.limit(limit).offset(offset)))
-            .scalars()
-            .all()
-        )
+        rows = (await self._s.execute(main_stmt.limit(limit).offset(offset))).scalars().all()
         return [_fandom_ref(m) for m in rows], total
 
     async def get_fandom(self, fandom_id: FandomId) -> FandomRef | None:

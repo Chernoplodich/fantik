@@ -8,6 +8,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.application.reading.ports import FeedItem
 from app.domain.fanfics.entities import Chapter
 from app.presentation.bot.callback_data.reader import ReadNav
+from app.presentation.bot.keyboards.social import (
+    report_fic_button,
+    subscribe_button,
+)
 
 _NOOP = "noop"
 
@@ -22,21 +26,24 @@ def cover_kb(
     has_progress: bool,
     progress_chapter_no: int | None,
     progress_page_no: int | None,
+    is_subscribed: bool = False,
+    show_subscribe: bool = True,
 ) -> InlineKeyboardMarkup:
     """Клавиатура на карточке-обложке.
 
-    Все кнопки используют `a="read"`, т.к. cover — photo message: navigation
-    через `edit_message_text` не работает. Handler `start_reading` удаляет
-    сообщение-обложку и отправляет новое текстовое со страницей.
+    Все кнопки чтения используют `a="read"`, т.к. cover — photo message:
+    navigation через `edit_message_text` не работает. Handler `start_reading`
+    удаляет сообщение-обложку и отправляет новое текстовое со страницей.
+
+    `show_subscribe=False` используется, когда автор смотрит свою собственную
+    работу (подписываться на себя нельзя).
     """
     b = InlineKeyboardBuilder()
     if has_progress and progress_chapter_no and progress_page_no:
         b.row(
             _btn(
                 f"▶ Продолжить (гл.{progress_chapter_no}, стр.{progress_page_no})",
-                ReadNav(
-                    a="read", f=fic_id, c=progress_chapter_no, p=progress_page_no
-                ).pack(),
+                ReadNav(a="read", f=fic_id, c=progress_chapter_no, p=progress_page_no).pack(),
             )
         )
         b.row(
@@ -52,6 +59,9 @@ def cover_kb(
                 ReadNav(a="read", f=fic_id, c=1, p=1).pack(),
             )
         )
+    if show_subscribe:
+        b.row(subscribe_button(fic_id=fic_id, is_subscribed=is_subscribed))
+    b.row(report_fic_button(fic_id))
     b.row(_btn("⟵ Каталог", "menu:browse"))
     return b.as_markup()
 

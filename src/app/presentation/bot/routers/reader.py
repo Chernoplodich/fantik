@@ -6,6 +6,7 @@ from typing import Any
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from dishka.integrations.aiogram import FromDishka, inject
 
@@ -42,20 +43,24 @@ from app.application.reading.toggle_like import (
     ToggleLikeCommand,
     ToggleLikeUseCase,
 )
+from app.application.subscriptions.ports import ISubscriptionRepository
 from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.domain.fanfics.value_objects import FicStatus
-from app.domain.shared.types import FanficId
+from app.domain.reports.value_objects import ReportTarget
+from app.domain.shared.types import FanficId, UserId
 from app.infrastructure.telegram.reader_renderer import (
     build_cover_caption,
     build_reader_message,
 )
 from app.presentation.bot.callback_data.reader import ReadNav
+from app.presentation.bot.fsm.states.report import ReportFlow
 from app.presentation.bot.keyboards.reader import (
     cover_kb,
     reader_kb,
     toc_kb,
 )
+from app.presentation.bot.keyboards.social import report_reason_picker_kb
 
 log = get_logger(__name__)
 router = Router(name="reader")
@@ -71,6 +76,7 @@ async def open_fanfic(
     callback_data: ReadNav,
     open_uc: FromDishka[OpenFanficUseCase],
     users: FromDishka[IUserRepository],
+    subs: FromDishka[ISubscriptionRepository],
     bot: FromDishka[Bot],
 ) -> None:
     if cb.from_user is None or cb.message is None:
@@ -86,11 +92,21 @@ async def open_fanfic(
     author = await users.get(fic.author_id)
     caption, caption_entities = build_cover_caption(fic, author.author_nick if author else None)
 
+    show_subscribe = int(fic.author_id) != int(cb.from_user.id)
+    is_subscribed = False
+    if show_subscribe:
+        is_subscribed = await subs.exists(
+            subscriber_id=UserId(cb.from_user.id),
+            author_id=fic.author_id,
+        )
+
     kb = cover_kb(
         fic_id=int(fic.id),
         has_progress=result.has_progress,
         progress_chapter_no=result.progress_chapter_number,
         progress_page_no=result.progress_page_no,
+        is_subscribed=is_subscribed,
+        show_subscribe=show_subscribe,
     )
 
     if fic.cover_file_id:
@@ -140,14 +156,30 @@ async def start_reading(
         return
 
     fic = await fanfics.get(FanficId(callback_data.f))
-    if fic is None or fic.status != FicStatus.APPROVED:
+    if fic is None or fic.status == FicStatus.ARCHIVED:
         await cb.answer("Фик недоступен.", show_alert=True)
         return
-    chapters = [
-        c for c in await chapters_repo.list_by_fic(fic.id) if c.status == FicStatus.APPROVED
-    ]
+    viewer_is_author = int(fic.author_id) == int(cb.from_user.id)
+    if not viewer_is_author and fic.status != FicStatus.APPROVED:
+        await cb.answer("Фик недоступен.", show_alert=True)
+        return
+    if viewer_is_author:
+        author_visible = {
+            FicStatus.DRAFT,
+            FicStatus.PENDING,
+            FicStatus.APPROVED,
+            FicStatus.REJECTED,
+            FicStatus.REVISING,
+        }
+        chapters = [
+            c for c in await chapters_repo.list_by_fic(fic.id) if c.status in author_visible
+        ]
+    else:
+        chapters = [
+            c for c in await chapters_repo.list_by_fic(fic.id) if c.status == FicStatus.APPROVED
+        ]
     if not chapters:
-        await cb.answer("У фика пока нет опубликованных глав.", show_alert=True)
+        await cb.answer("У фика пока нет глав.", show_alert=True)
         return
     chapters.sort(key=lambda c: int(c.number))
 
@@ -155,9 +187,7 @@ async def start_reading(
     # открываем первую главу со страницы 1.
     target_chapter_no = callback_data.c if callback_data.c >= 1 else int(chapters[0].number)
     target_page = callback_data.p if callback_data.p >= 1 else 1
-    target_chapter = next(
-        (c for c in chapters if int(c.number) == target_chapter_no), None
-    )
+    target_chapter = next((c for c in chapters if int(c.number) == target_chapter_no), None)
     if target_chapter is None:
         target_chapter = chapters[0]
         target_page = 1
@@ -231,7 +261,10 @@ async def start_reading(
         page_no=int(result.page.page_no),
     )
     _prefetch(
-        page_cache, pages_repo, chapters_repo, int(target_chapter.id),
+        page_cache,
+        pages_repo,
+        chapters_repo,
+        int(target_chapter.id),
         int(result.page.page_no) + 1,
     )
     await cb.answer()
@@ -258,11 +291,17 @@ async def navigate(
 
     fic_id = FanficId(callback_data.f)
     fic = await fanfics.get(fic_id)
-    if fic is None or fic.status != FicStatus.APPROVED:
+    if fic is None or fic.status == FicStatus.ARCHIVED:
+        await cb.answer("Фик недоступен.", show_alert=True)
+        return
+    viewer_is_author = int(fic.author_id) == int(cb.from_user.id)
+    if not viewer_is_author and fic.status != FicStatus.APPROVED:
         await cb.answer("Фик недоступен.", show_alert=True)
         return
 
-    chapter = await _resolve_chapter_by_number(chapters_repo, fic_id, callback_data.c)
+    chapter = await _resolve_chapter_by_number(
+        chapters_repo, fic_id, callback_data.c, viewer_is_author=viewer_is_author
+    )
     if chapter is None:
         await cb.answer("Глава не найдена.", show_alert=True)
         return
@@ -339,14 +378,16 @@ async def show_toc(
     cb: CallbackQuery,
     callback_data: ReadNav,
     chapters_repo: FromDishka[IChapterRepository],
+    fanfics: FromDishka[IFanficRepository],
 ) -> None:
-    if cb.message is None:
+    if cb.message is None or cb.from_user is None:
         await cb.answer()
         return
     fic_id = FanficId(callback_data.f)
-    chapters = [
-        c for c in await chapters_repo.list_by_fic(fic_id) if c.status == FicStatus.APPROVED
-    ]
+    fic = await fanfics.get(fic_id)
+    viewer_is_author = fic is not None and int(fic.author_id) == int(cb.from_user.id)
+    allowed = _AUTHOR_VISIBLE_CH_STATUSES if viewer_is_author else {FicStatus.APPROVED}
+    chapters = [c for c in await chapters_repo.list_by_fic(fic_id) if c.status in allowed]
     chapters.sort(key=lambda c: int(c.number))
     try:
         await cb.message.edit_reply_markup(  # type: ignore[union-attr]
@@ -409,11 +450,27 @@ async def toggle_like(
 
 
 @router.callback_query(ReadNav.filter(F.a == "report"))
-async def report_stub(cb: CallbackQuery) -> None:
-    await cb.answer(
-        "Жалобы появятся в следующих обновлениях.",
-        show_alert=True,
+async def report_from_reader(
+    cb: CallbackQuery,
+    callback_data: ReadNav,
+    state: FSMContext,
+) -> None:
+    """Открыть FSM жалобы с цели-фик. Page-level жалоба эскалируется до уровня
+    фика: у модератора проще разбирать единичную запись, чем дублированные
+    жалобы на каждую страницу."""
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+    await state.set_state(ReportFlow.waiting_reason)
+    await state.update_data(
+        target_type=ReportTarget.FANFIC.value,
+        target_id=int(callback_data.f),
     )
+    await cb.message.answer(
+        "Выбери причину жалобы:",
+        reply_markup=report_reason_picker_kb(),
+    )
+    await cb.answer()
 
 
 @router.callback_query(ReadNav.filter(F.a == "complete"))
@@ -458,15 +515,31 @@ async def noop(cb: CallbackQuery) -> None:
 # ---------- helpers ----------
 
 
+_AUTHOR_VISIBLE_CH_STATUSES: frozenset[FicStatus] = frozenset(
+    {
+        FicStatus.DRAFT,
+        FicStatus.PENDING,
+        FicStatus.APPROVED,
+        FicStatus.REJECTED,
+        FicStatus.REVISING,
+    }
+)
+
+
 async def _resolve_chapter_by_number(
     chapters_repo: IChapterRepository,
     fic_id: FanficId,
     chapter_no: int,
+    *,
+    viewer_is_author: bool = False,
 ) -> Any:
-    """Вернуть approved-главу фика по номеру (None если нет)."""
-    chapters = [
-        c for c in await chapters_repo.list_by_fic(fic_id) if c.status == FicStatus.APPROVED
-    ]
+    """Вернуть главу фика по номеру (None если нет).
+
+    Для автора — любая видимая (draft/pending/approved/rejected/revising),
+    для читателя — только approved.
+    """
+    allowed = _AUTHOR_VISIBLE_CH_STATUSES if viewer_is_author else {FicStatus.APPROVED}
+    chapters = [c for c in await chapters_repo.list_by_fic(fic_id) if c.status in allowed]
     for c in chapters:
         if int(c.number) == int(chapter_no):
             return c
@@ -528,7 +601,10 @@ async def _refresh_keyboard(
     fic = await fanfics.get(fic_id)
     if fic is None:
         return
-    chapter = await _resolve_chapter_by_number(chapters_repo, fic_id, nav.c)
+    viewer_is_author = int(fic.author_id) == int(cb.from_user.id)
+    chapter = await _resolve_chapter_by_number(
+        chapters_repo, fic_id, nav.c, viewer_is_author=viewer_is_author
+    )
     if chapter is None:
         return
     try:

@@ -25,26 +25,28 @@ from app.domain.fanfics.exceptions import InvalidEntityError
 from app.domain.fanfics.value_objects import MAX_ENTITIES_PER_TEXT
 from app.domain.shared.utf16 import utf16_length
 
-ALLOWED_TYPES: frozenset[str] = frozenset({
-    "bold",
-    "italic",
-    "underline",
-    "strikethrough",
-    "spoiler",
-    "code",
-    "pre",
-    "blockquote",
-    "expandable_blockquote",
-    "text_link",
-    "custom_emoji",
-    "url",
-    "email",
-    "phone_number",
-    "mention",
-    "hashtag",
-    "cashtag",
-    "bot_command",
-})
+ALLOWED_TYPES: frozenset[str] = frozenset(
+    {
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "spoiler",
+        "code",
+        "pre",
+        "blockquote",
+        "expandable_blockquote",
+        "text_link",
+        "custom_emoji",
+        "url",
+        "email",
+        "phone_number",
+        "mention",
+        "hashtag",
+        "cashtag",
+        "bot_command",
+    }
+)
 
 ALLOWED_URL_SCHEMES: frozenset[str] = frozenset({"http", "https", "tg", "mailto"})
 
@@ -57,9 +59,7 @@ def _validate_one(e: dict[str, Any], text_u16_len: int) -> dict[str, Any]:
     if not isinstance(t, str):
         raise InvalidEntityError("entity.type must be a string")
     if t == "text_mention":
-        raise InvalidEntityError(
-            "text_mention не допускается в MVP (приватность)."
-        )
+        raise InvalidEntityError("text_mention не допускается в MVP (приватность).")
     if t not in ALLOWED_TYPES:
         raise InvalidEntityError(f"entity type {t!r} не разрешён")
 

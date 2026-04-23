@@ -17,6 +17,7 @@ from app.infrastructure.tasks.broker import broker  # noqa: F401 (re-exported fo
 # Регистрация задач: при импорте этих модулей их `@broker.task`-декораторы
 # добавляют таски в broker.tasks.
 from app.infrastructure.tasks import indexing  # noqa: F401
+from app.infrastructure.tasks import notifications  # noqa: F401
 from app.infrastructure.tasks import outbox_dispatcher  # noqa: F401
 from app.infrastructure.tasks import repagination  # noqa: F401
 
@@ -35,6 +36,7 @@ def _run() -> None:
             # сканировать .venv и падает на произвольных модулях.
             "app.infrastructure.tasks.repagination",
             "app.infrastructure.tasks.indexing",
+            "app.infrastructure.tasks.notifications",
             "app.infrastructure.tasks.outbox_dispatcher",
             "--log-level",
             get_settings().log_level,

@@ -13,9 +13,12 @@ from app.infrastructure.db.models.fanfic_version import FanficVersion
 from app.infrastructure.db.models.like import Like
 from app.infrastructure.db.models.moderation_queue import ModerationQueue
 from app.infrastructure.db.models.moderation_reason import ModerationReason
+from app.infrastructure.db.models.notification import Notification
 from app.infrastructure.db.models.outbox import Outbox
 from app.infrastructure.db.models.read_completed import ReadCompleted
 from app.infrastructure.db.models.reading_progress import ReadingProgress
+from app.infrastructure.db.models.report import Report
+from app.infrastructure.db.models.subscription import Subscription
 from app.infrastructure.db.models.tag import Tag
 from app.infrastructure.db.models.tracking import (
     TrackingCode,
@@ -37,9 +40,12 @@ __all__ = [
     "Like",
     "ModerationQueue",
     "ModerationReason",
+    "Notification",
     "Outbox",
     "ReadCompleted",
     "ReadingProgress",
+    "Report",
+    "Subscription",
     "Tag",
     "TrackingCode",
     "TrackingEvent",

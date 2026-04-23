@@ -90,6 +90,9 @@ def _build_settings() -> MeilisearchSettings:
         ],
         filterable_attributes=[
             "fandom_id",
+            # fandom_name используется как фасет: Meili требует filterable-атрибут
+            # для возврата facetDistribution (см. application/search/filter_builder.FACETS).
+            "fandom_name",
             "age_rating",
             "age_rating_order",
             "tags",
@@ -130,12 +133,15 @@ def _build_settings() -> MeilisearchSettings:
 
 
 async def ensure_index(client: AsyncClient) -> None:
-    """Создаёт индекс с primary_key='id', если его ещё нет (иначе — no-op)."""
+    """Создаёт индекс с primary_key='id', если его ещё нет (иначе — no-op).
+
+    В SDK 7.x `create_index` сам ждёт завершения задачи и возвращает `AsyncIndex`,
+    так что отдельный `wait_for_task` не нужен (атрибута `task_uid` на AsyncIndex нет).
+    """
     try:
         await client.get_index(INDEX_NAME)
     except MeilisearchApiError:
-        task = await client.create_index(uid=INDEX_NAME, primary_key=PRIMARY_KEY)
-        await client.wait_for_task(task.task_uid)
+        await client.create_index(uid=INDEX_NAME, primary_key=PRIMARY_KEY)
         log.info("meili_index_created", index=INDEX_NAME, primary_key=PRIMARY_KEY)
 
 

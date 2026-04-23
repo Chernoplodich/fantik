@@ -77,9 +77,15 @@ class User(EventEmitter):
 
     # ---------- бизнес-операции ----------
 
-    def touch(self, *, now: datetime, username: str | None = None,
-              first_name: str | None = None, last_name: str | None = None,
-              language_code: str | None = None) -> None:
+    def touch(
+        self,
+        *,
+        now: datetime,
+        username: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        language_code: str | None = None,
+    ) -> None:
         """Обновить профиль при очередном апдейте. Не эмитит события."""
         self.last_seen_at = now
         if username is not None:

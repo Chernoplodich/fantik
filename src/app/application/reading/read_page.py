@@ -67,20 +67,41 @@ class ReadPageUseCase:
         user_id = UserId(cmd.user_id)
 
         fic = await self._fanfics.get(fic_id)
-        if fic is None or fic.status != FicStatus.APPROVED:
+        if fic is None:
+            raise NotFoundError("Фик недоступен.")
+
+        viewer_is_author = fic.author_id == user_id
+        if viewer_is_author:
+            if fic.status == FicStatus.ARCHIVED:
+                raise NotFoundError("Фик архивирован.")
+        elif fic.status != FicStatus.APPROVED:
             raise NotFoundError("Фик недоступен.")
 
         chapter = await self._chapters.get(ch_id)
         if chapter is None or chapter.fic_id != fic_id:
             raise NotFoundError("Глава не найдена.")
-        if chapter.status != FicStatus.APPROVED:
+        # Автор видит свои главы в любом статусе кроме archived; читатель — только approved.
+        author_visible_statuses = {
+            FicStatus.DRAFT,
+            FicStatus.PENDING,
+            FicStatus.APPROVED,
+            FicStatus.REJECTED,
+            FicStatus.REVISING,
+        }
+        if viewer_is_author:
+            if chapter.status not in author_visible_statuses:
+                raise NotFoundError("Глава недоступна.")
+        elif chapter.status != FicStatus.APPROVED:
             raise NotFoundError("Глава недоступна.")
 
         chapters = await self._chapters.list_by_fic(fic_id)
-        approved = [c for c in chapters if c.status == FicStatus.APPROVED]
-        approved.sort(key=lambda c: int(c.number))
-        total_chapters = len(approved)
-        is_last_chapter = bool(approved) and int(approved[-1].id) == int(chapter.id)
+        if viewer_is_author:
+            visible = [c for c in chapters if c.status in author_visible_statuses]
+        else:
+            visible = [c for c in chapters if c.status == FicStatus.APPROVED]
+        visible.sort(key=lambda c: int(c.number))
+        total_chapters = len(visible)
+        is_last_chapter = bool(visible) and int(visible[-1].id) == int(chapter.id)
 
         page, total_pages = await self._get_page(chapter, cmd.page_no)
         is_last_page_in_chapter = cmd.page_no >= total_pages

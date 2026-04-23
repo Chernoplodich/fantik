@@ -36,9 +36,7 @@ class AuthorNotifier(IAuthorNotifier):
     def __init__(self, bot: Bot) -> None:
         self._bot = bot
 
-    async def notify_approved(
-        self, *, author_id: UserId, fic_id: FanficId, fic_title: str
-    ) -> None:
+    async def notify_approved(self, *, author_id: UserId, fic_id: FanficId, fic_title: str) -> None:
         text = f"✅ Твоя работа «{fic_title}» одобрена и опубликована."
         try:
             await self._bot.send_message(chat_id=int(author_id), text=text)
@@ -129,6 +127,4 @@ class AuthorNotifier(IAuthorNotifier):
         try:
             await self._bot.send_message(chat_id=int(author_id), text=text)
         except TelegramAPIError as e:
-            log.warning(
-                "notifier_chapter_reject_failed user_id=%s err=%r", int(author_id), e
-            )
+            log.warning("notifier_chapter_reject_failed user_id=%s err=%r", int(author_id), e)

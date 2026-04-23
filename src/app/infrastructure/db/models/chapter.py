@@ -38,9 +38,7 @@ class Chapter(Base):
     entities: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
-    chars_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0"
-    )
+    chars_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     status: Mapped[FicStatus] = mapped_column(
         Enum(
             FicStatus,
@@ -77,4 +75,11 @@ class Chapter(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+    # Устанавливается в ApproveUseCase при первом переводе в APPROVED.
+    # NULL → глава никогда не публиковалась (все previous approvals сбрасываются
+    # миграцией backfill'ом только для уже опубликованных).
+    first_approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )

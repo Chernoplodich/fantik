@@ -52,9 +52,7 @@ class ModeratorNotifier(IModeratorNotifier):
             author_parts.append(f"<b>{escape(str(author.author_nick))}</b>")
         if author and author.username:
             author_parts.append(f"(@{escape(author.username)})")
-        author_parts.append(
-            f'<a href="tg://user?id={int(author_id)}">id{int(author_id)}</a>'
-        )
+        author_parts.append(f'<a href="tg://user?id={int(author_id)}">id{int(author_id)}</a>')
         author_line = " ".join(author_parts)
 
         text = (

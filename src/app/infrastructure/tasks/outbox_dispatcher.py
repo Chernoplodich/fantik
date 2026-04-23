@@ -5,9 +5,14 @@
 и отмечает published_at = now().
 
 Маршруты:
-- `fanfic.approved`  → `repaginate_chapter(chapter_id)` для каждой главы + `index_fanfic(fic_id)`
+- `fanfic.approved`  → `repaginate_chapter(chapter_id)` для каждой главы +
+                       `index_fanfic(fic_id)` + fanout уведомлений подписчикам
+                       (только для первой публикации / новой главы).
 - `fanfic.edited`    → `index_fanfic(fic_id)`
 - `fanfic.archived`  → `index_fanfic(fic_id)` (задача сама удалит документ по статусу)
+- `report.created`   → no-op (модераторы видят жалобы в своей вкладке).
+- `report.handled`   → `notify_moderation_decision(reporter_id, report_id)` при
+                       notify_reporter=True.
 
 Остальные события пропускаются с пометкой published_at, чтобы не копились.
 """
@@ -24,6 +29,12 @@ from app.core.logging import get_logger
 from app.infrastructure.tasks._container import get_worker_container
 from app.infrastructure.tasks.broker import broker
 from app.infrastructure.tasks.indexing import index_fanfic
+from app.infrastructure.tasks.notifications import (
+    notify_author_fic_archived,
+    notify_moderation_decision,
+    notify_new_chapter,
+    notify_new_work,
+)
 from app.infrastructure.tasks.repagination import repaginate_chapter
 
 log = get_logger(__name__)
@@ -51,6 +62,64 @@ async def _enqueue_repaginate(chapter_id: int) -> None:
         )
 
 
+async def _enqueue_notify_new_work(author_id: int, fic_id: int) -> None:
+    try:
+        await notify_new_work.kiq(author_id, fic_id)
+    except Exception as e:
+        log.warning(
+            "outbox_dispatch_notify_new_work_enqueue_failed",
+            author_id=author_id,
+            fic_id=fic_id,
+            error=str(e),
+        )
+
+
+async def _enqueue_notify_new_chapter(author_id: int, fic_id: int, chapter_id: int) -> None:
+    try:
+        await notify_new_chapter.kiq(author_id, fic_id, chapter_id)
+    except Exception as e:
+        log.warning(
+            "outbox_dispatch_notify_new_chapter_enqueue_failed",
+            author_id=author_id,
+            fic_id=fic_id,
+            chapter_id=chapter_id,
+            error=str(e),
+        )
+
+
+async def _enqueue_notify_moderation_decision(user_id: int, report_id: int) -> None:
+    try:
+        await notify_moderation_decision.kiq(user_id, report_id)
+    except Exception as e:
+        log.warning(
+            "outbox_dispatch_notify_moderation_decision_enqueue_failed",
+            user_id=user_id,
+            report_id=report_id,
+            error=str(e),
+        )
+
+
+async def _enqueue_notify_author_fic_archived(
+    author_id: int,
+    fic_id: int,
+    fic_title: str,
+    report_id: int,
+    reason_code: str | None,
+    moderator_comment: str | None,
+) -> None:
+    try:
+        await notify_author_fic_archived.kiq(
+            author_id, fic_id, fic_title, report_id, reason_code, moderator_comment
+        )
+    except Exception as e:
+        log.warning(
+            "outbox_dispatch_notify_author_archived_enqueue_failed",
+            author_id=author_id,
+            fic_id=fic_id,
+            error=str(e),
+        )
+
+
 async def _dispatch_one(event_type: str, payload: dict[str, Any]) -> None:
     if event_type == "fanfic.approved":
         chapter_ids = payload.get("chapter_ids") or []
@@ -59,6 +128,20 @@ async def _dispatch_one(event_type: str, payload: dict[str, Any]) -> None:
         fic_id = payload.get("fic_id")
         if fic_id is not None:
             await _enqueue_index(int(fic_id))
+
+        # Fanout подписчикам:
+        #  * first_publish=True → уведомление о новой работе;
+        #  * new_chapter_ids — главы, одобренные впервые (добавленные к уже
+        #    опубликованной работе), шлём notify_new_chapter для каждой.
+        # Чистые правки (edit без новых глав) → new_chapter_ids пустой, fanout нет.
+        author_id = payload.get("author_id")
+        if fic_id is not None and author_id is not None:
+            if bool(payload.get("first_publish")):
+                await _enqueue_notify_new_work(int(author_id), int(fic_id))
+            else:
+                new_chapter_ids = payload.get("new_chapter_ids") or []
+                for ch_id in new_chapter_ids:
+                    await _enqueue_notify_new_chapter(int(author_id), int(fic_id), int(ch_id))
         return
 
     if event_type in _INDEX_EVENTS:
@@ -67,7 +150,31 @@ async def _dispatch_one(event_type: str, payload: dict[str, Any]) -> None:
             await _enqueue_index(int(fic_id))
         return
 
-    # неизвестные/не-индекс события — просто маркируем как обработанные, чтобы не копились
+    if event_type == "report.handled":
+        if not bool(payload.get("notify_reporter")):
+            return
+        reporter_id = payload.get("reporter_id")
+        report_id = payload.get("report_id")
+        if reporter_id is not None and report_id is not None:
+            await _enqueue_notify_moderation_decision(int(reporter_id), int(report_id))
+        return
+
+    if event_type == "fanfic.archived_by_report":
+        author_id = payload.get("author_id")
+        fic_id = payload.get("fic_id")
+        report_id = payload.get("report_id")
+        if author_id is not None and fic_id is not None and report_id is not None:
+            await _enqueue_notify_author_fic_archived(
+                int(author_id),
+                int(fic_id),
+                str(payload.get("fic_title") or ""),
+                int(report_id),
+                payload.get("reason_code"),
+                payload.get("moderator_comment"),
+            )
+        return
+
+    # report.created и прочее — без TaskIQ-задачи, просто маркируем published_at.
 
 
 async def _process_batch(session: AsyncSession) -> int:

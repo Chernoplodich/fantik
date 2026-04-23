@@ -49,17 +49,10 @@ MESSAGES: dict[str, str] = {
     ),
     "admin_menu": "⚙️ Админ-панель",
     "mod_menu": "🛡 Панель модератора. Нажми «Следующая работа», чтобы взять задание.",
-
     # ---------- Create fanfic ----------
-    "need_author_nick": (
-        "Сначала задай ник автора. Открой /profile → «Стать автором»."
-    ),
-    "fic_create_title_prompt": (
-        "Название работы (2–128 символов). Можно с форматированием."
-    ),
-    "fic_create_summary_prompt": (
-        "Описание работы (до 2000 символов). Можно с форматированием."
-    ),
+    "need_author_nick": ("Сначала задай ник автора. Открой /profile → «Стать автором»."),
+    "fic_create_title_prompt": ("Название работы (2–128 символов). Можно с форматированием."),
+    "fic_create_summary_prompt": ("Описание работы (до 2000 символов). Можно с форматированием."),
     "fic_create_fandom_prompt": (
         "Выбери фандом.\n"
         "Нужного нет в списке? Выбери «Оригинальная вселенная» или «Кроссовер» — "
@@ -97,7 +90,6 @@ MESSAGES: dict[str, str] = {
         "символов. Пришли меньший кусок или «Закончить главу» как есть."
     ),
     "chapter_discarded": "Черновик главы отброшен.",
-
     # ---------- Edit meta ----------
     "edit_menu": (
         "<b>Редактирование работы</b>\n"
@@ -113,20 +105,16 @@ MESSAGES: dict[str, str] = {
     "edit_prompt_fandom": "Выбери новый фандом:",
     "edit_prompt_age_rating": "Выбери новый возрастной рейтинг:",
     "edit_prompt_tags": (
-        "Пришли новый список тегов через запятую (до 20). "
-        "Или «-» чтобы очистить."
+        "Пришли новый список тегов через запятую (до 20). Или «-» чтобы очистить."
     ),
     "edit_prompt_cover": "Пришли новую обложку картинкой (JPEG/PNG, ≤ 5 МБ).",
     "edit_done": "Готово, изменения сохранены.",
     "edit_cover_cleared": "Обложка удалена.",
-
     # ---------- Chapter list / edit / delete ----------
     "chapters_list_header": "📚 Главы работы «{title}» ({count}):",
     "chapters_list_empty": "В работе пока нет глав. Добавь первую.",
     "chapter_card": (
-        "📖 <b>Глава {number}. {title}</b>\n"
-        "Статус: {status}\n"
-        "Символов (UTF-16): {chars}"
+        "📖 <b>Глава {number}. {title}</b>\nСтатус: {status}\nСимволов (UTF-16): {chars}"
     ),
     "chapter_edit_title_prompt": "Пришли новое название главы (1–128 символов):",
     "chapter_edit_text_prompt": (
@@ -135,8 +123,7 @@ MESSAGES: dict[str, str] = {
     ),
     "chapter_updated_msg": "✅ Глава обновлена ({u16} симв. UTF-16).",
     "chapter_delete_confirm": (
-        "Удалить главу {number} «{title}» безвозвратно?\n"
-        "Это действие нельзя отменить."
+        "Удалить главу {number} «{title}» безвозвратно?\nЭто действие нельзя отменить."
     ),
     "chapter_deleted": "🗑 Глава удалена.",
     "chapter_delete_cancelled": "Удаление отменено.",
@@ -144,12 +131,10 @@ MESSAGES: dict[str, str] = {
     "fic_create_saved": "Работа сохранена.",
     "fic_expect_text": "Ожидался текст. Попробуй ещё раз.",
     "fic_expect_photo": "Нужна картинка или нажми «Пропустить».",
-
     # ---------- Chapter ----------
     "chapter_added": "Глава {number} добавлена ({chars} симв. UTF-16).",
     "chapter_updated": "Глава обновлена.",
     "chapter_deleted": "Глава удалена.",
-
     # ---------- Submit / moderation (автор) ----------
     "submit_success": (
         "📤 Работа отправлена на модерацию (задание #{case_id}, версия {version}).\n"
@@ -161,18 +146,12 @@ MESSAGES: dict[str, str] = {
     "cancel_success": "Подача отменена.",
     "cancel_being_reviewed": "Работу уже смотрит модератор. Отменить нельзя.",
     "revise_success": "Работа переведена в статус «Дорабатывается». Внеси правки и отправь снова.",
-
     # ---------- My works ----------
     "my_works_empty": "У тебя пока нет работ. Нажми «Новая работа», чтобы начать.",
     "my_works_header": "📚 Твои работы ({total}):",
     "my_works_card": (
-        "📝 <b>{title}</b>\n"
-        "Статус: {status}\n"
-        "Глав: {chapters}\n"
-        "Обновлено: {updated}\n"
-        "\n{summary}"
+        "📝 <b>{title}</b>\nСтатус: {status}\nГлав: {chapters}\nОбновлено: {updated}\n\n{summary}"
     ),
-
     # ---------- Moderation (модератор) ----------
     "mod_queue_empty": "В очереди сейчас пусто. Отличная работа!",
     "mod_card_header": (
@@ -188,17 +167,10 @@ MESSAGES: dict[str, str] = {
         "{summary}"
     ),
     "mod_chapter_header": "📖 Глава {number}. {title}",
-    "mod_reasons_prompt": (
-        "Выбери одну или несколько причин отказа, затем нажми «Далее»."
-    ),
-    "mod_comment_prompt": (
-        "Комментарий к отказу (до 2000 символов) или «-», чтобы пропустить."
-    ),
+    "mod_reasons_prompt": ("Выбери одну или несколько причин отказа, затем нажми «Далее»."),
+    "mod_comment_prompt": ("Комментарий к отказу (до 2000 символов) или «-», чтобы пропустить."),
     "mod_confirm_preview": (
-        "<b>Превью отказа</b>\n\n"
-        "Причины: {reasons}\n\n"
-        "Комментарий: {comment}\n\n"
-        "Подтверди отказ:"
+        "<b>Превью отказа</b>\n\nПричины: {reasons}\n\nКомментарий: {comment}\n\nПодтверди отказ:"
     ),
     "mod_decision_applied": "✅ Решение применено.",
     "mod_already_decided": "Решение уже принято ранее.",

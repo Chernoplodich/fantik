@@ -58,6 +58,9 @@ class Chapter(EventEmitter):
     status: FicStatus = FicStatus.DRAFT
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # NULL = глава никогда не публиковалась (не было approve). Важно для
+    # fanout уведомлений подписчикам: шлём только при первом approve главы.
+    first_approved_at: datetime | None = None
 
     def __post_init__(self) -> None:
         EventEmitter.__init__(self)
@@ -123,7 +126,13 @@ class Chapter(EventEmitter):
             raise WrongStatusError("Одобрить можно только pending-главу.")
         self.status = FicStatus.APPROVED
         self.updated_at = now
+        if self.first_approved_at is None:
+            self.first_approved_at = now
         self._emit(ChapterApproved(fic_id=self.fic_id, chapter_id=self.id))
+
+    def was_previously_approved(self) -> bool:
+        """Одобрялась ли глава ранее (независимо от текущего статуса)."""
+        return self.first_approved_at is not None
 
     def reject(self, *, reason_ids: list[int], now: datetime) -> None:
         if self.status != FicStatus.PENDING:

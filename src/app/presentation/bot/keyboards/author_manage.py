@@ -14,6 +14,7 @@ from app.presentation.bot.callback_data.fanfic import (
     EditFieldCD,
     FanficCD,
 )
+from app.presentation.bot.callback_data.reader import ReadNav
 
 
 STATUS_LABELS = {
@@ -43,6 +44,13 @@ def build_my_works_kb(items: list[FanficListItem]) -> InlineKeyboardMarkup:
 def build_fanfic_card_kb(fic_id: int, status: FicStatus) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     fic_id_int = int(fic_id)
+    # Кнопка «📖 Читать» для автора — во всех статусах кроме archived (включая
+    # draft/pending/rejected/revising: автор может превьюшить свой текст).
+    if status != FicStatus.ARCHIVED:
+        b.button(
+            text="📖 Читать",
+            callback_data=ReadNav(a="open", f=fic_id_int).pack(),
+        )
     if status in (FicStatus.DRAFT, FicStatus.REVISING):
         b.button(
             text="➕ Добавить главу",

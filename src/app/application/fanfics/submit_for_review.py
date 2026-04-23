@@ -101,9 +101,11 @@ class SubmitForReviewUseCase:
             if not chapters_list:
                 raise EmptyFanficError("Нельзя отправить фик без глав.")
 
-            is_first_submit = (fic.first_published_at is None
-                               and fic.status in (FicStatus.DRAFT, FicStatus.REJECTED,
-                                                  FicStatus.REVISING))
+            is_first_submit = fic.first_published_at is None and fic.status in (
+                FicStatus.DRAFT,
+                FicStatus.REJECTED,
+                FicStatus.REVISING,
+            )
 
             # лимит: считаем только для первого submit (новые фики, поданные сегодня).
             if is_first_submit and already >= self._settings.max_fics_per_day:
@@ -112,11 +114,7 @@ class SubmitForReviewUseCase:
                 )
 
             # kind до перехода fanfic в pending
-            kind = (
-                MqKind.FIC_FIRST_PUBLISH
-                if fic.first_published_at is None
-                else MqKind.FIC_EDIT
-            )
+            kind = MqKind.FIC_FIRST_PUBLISH if fic.first_published_at is None else MqKind.FIC_EDIT
 
             # перевод глав (только тех, что требуют: draft/rejected/revising)
             for ch in chapters_list:
@@ -185,6 +183,4 @@ class SubmitForReviewUseCase:
             except Exception:
                 pass
 
-        return SubmitForReviewResult(
-            case_id=int(case.id), kind=kind, version_no=version_no
-        )
+        return SubmitForReviewResult(case_id=int(case.id), kind=kind, version_no=version_no)

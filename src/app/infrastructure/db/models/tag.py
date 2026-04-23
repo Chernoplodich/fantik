@@ -32,13 +32,9 @@ class Tag(BigIntPkMixin, Base):
         ForeignKey("tags.id", ondelete="SET NULL"),
         nullable=True,
     )
-    approved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_tags_kind_usage", "kind", "usage_count"),
-    )
+    __table_args__ = (Index("ix_tags_kind_usage", "kind", "usage_count"),)

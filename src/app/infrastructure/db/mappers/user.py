@@ -19,9 +19,7 @@ def to_domain(m: UserModel) -> UserEntity:
         role=Role(m.role),
         author_nick=AuthorNick(m.author_nick) if m.author_nick else None,
         utm_source_code_id=(
-            TrackingCodeId(m.utm_source_code_id)
-            if m.utm_source_code_id is not None
-            else None
+            TrackingCodeId(m.utm_source_code_id) if m.utm_source_code_id is not None else None
         ),
         agreed_at=m.agreed_at,
         banned_at=m.banned_at,

@@ -86,9 +86,7 @@ class CreateDraftUseCase:
             tag_ids: list[TagId] = []
             for raw in raw_tags:
                 name, slug = tag_normalizer.normalize(raw)
-                tag_ref, _created = await self._tags.ensure(
-                    name=name, slug=slug, kind="freeform"
-                )
+                tag_ref, _created = await self._tags.ensure(name=name, slug=slug, kind="freeform")
                 if tag_ref.id not in tag_ids:
                     tag_ids.append(tag_ref.id)
 

@@ -33,9 +33,7 @@ class AuthorNick(str):
             raise ValidationError("author_nick must be a string")
         cleaned = value.strip()
         if not _NICK_RE.fullmatch(cleaned):
-            raise ValidationError(
-                "Ник 2–32 символа, только латиница, цифры, _ и -."
-            )
+            raise ValidationError("Ник 2–32 символа, только латиница, цифры, _ и -.")
         return super().__new__(cls, cleaned)
 
     @property

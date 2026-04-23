@@ -56,15 +56,11 @@ class ModerationCase(EventEmitter):
 
     def raise_if_owned_by(self, user_id: UserId) -> None:
         if self.submitted_by == user_id:
-            raise CannotModerateOwnWorkError(
-                "Модератор не может модерировать свои работы."
-            )
+            raise CannotModerateOwnWorkError("Модератор не может модерировать свои работы.")
 
     def is_locked(self, *, now: datetime) -> bool:
         return (
-            self.locked_by is not None
-            and self.locked_until is not None
-            and self.locked_until > now
+            self.locked_by is not None and self.locked_until is not None and self.locked_until > now
         )
 
     def _require_open(self) -> None:
@@ -129,9 +125,7 @@ class ModerationCase(EventEmitter):
         self._require_open()
         self._require_lock_of(moderator_id, now=now)
         if not reason_ids:
-            raise ReasonsRequiredForRejectError(
-                "Выбери хотя бы одну причину отказа."
-            )
+            raise ReasonsRequiredForRejectError("Выбери хотя бы одну причину отказа.")
         self.decision = MqDecision.REJECTED
         self.decision_reason_ids = list(reason_ids)
         self.decision_comment = comment

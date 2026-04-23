@@ -9,14 +9,23 @@ import pytest
 from app.core.config import Settings
 
 
+_DEFAULT_ENV = {
+    "BOT_TOKEN": "111:FAKE_TOKEN_FOR_TESTS_THAT_IS_LONG_ENOUGH",
+    "POSTGRES_PASSWORD": "pw",
+    "POSTGRES_DB": "fantik",
+    "POSTGRES_USER": "fantik",
+    "POSTGRES_HOST": "localhost",
+    "POSTGRES_PORT": "5432",
+    "POSTGRES_DSN": "",
+    "MEILI_MASTER_KEY": "meili-master-key-long-enough-for-tests",
+    "ADMIN_TG_IDS": "",
+}
+
+
 def _mk(**overrides: str) -> Settings:
-    base = {
-        "BOT_TOKEN": "111:FAKE_TOKEN_FOR_TESTS_THAT_IS_LONG_ENOUGH",
-        "POSTGRES_PASSWORD": "pw",
-        "MEILI_MASTER_KEY": "meili-master-key-long-enough-for-tests",
-        "ADMIN_TG_IDS": "",
-    }
-    base.update(overrides)
+    # Фиксируем все переменные, которые читает Settings, чтобы тест не зависел
+    # от env процесса (CI экспортирует POSTGRES_DB=fantik_test и т.п.).
+    base = {**_DEFAULT_ENV, **overrides}
     old = {}
     for k, v in base.items():
         old[k] = os.environ.get(k)
