@@ -12,16 +12,19 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListQueueBroker, RedisAsyncResultBackend, RedisScheduleSource
 
 from app.core.config import AppEnv, Settings, get_settings
+from app.infrastructure.tasks.middlewares import MetricsTaskMiddleware, SentryTaskMiddleware
 
 
 def _make_broker(settings: Settings, queue_name: str) -> AsyncBroker:
     if settings.app_env == AppEnv.TEST:
         return InMemoryBroker()
     redis_url = settings.redis_url_for(settings.redis_taskiq_db)
-    return ListQueueBroker(
+    b = ListQueueBroker(
         url=redis_url,
         queue_name=queue_name,
     ).with_result_backend(RedisAsyncResultBackend(redis_url=redis_url, result_ex_time=3600))
+    b.add_middlewares(MetricsTaskMiddleware(), SentryTaskMiddleware())
+    return b
 
 
 settings = get_settings()

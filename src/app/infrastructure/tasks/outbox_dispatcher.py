@@ -26,6 +26,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.core.metrics import CHAPTER_PUBLISHED_TOTAL, FIC_PUBLISHED_TOTAL
 from app.infrastructure.tasks._container import get_worker_container
 from app.infrastructure.tasks.broker import broker
 from app.infrastructure.tasks.indexing import index_fanfic
@@ -138,10 +139,13 @@ async def _dispatch_one(event_type: str, payload: dict[str, Any]) -> None:
         if fic_id is not None and author_id is not None:
             if bool(payload.get("first_publish")):
                 await _enqueue_notify_new_work(int(author_id), int(fic_id))
+                FIC_PUBLISHED_TOTAL.inc()
             else:
                 new_chapter_ids = payload.get("new_chapter_ids") or []
                 for ch_id in new_chapter_ids:
                     await _enqueue_notify_new_chapter(int(author_id), int(fic_id), int(ch_id))
+                if new_chapter_ids:
+                    CHAPTER_PUBLISHED_TOTAL.inc(len(new_chapter_ids))
         return
 
     if event_type in _INDEX_EVENTS:

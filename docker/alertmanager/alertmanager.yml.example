@@ -1,0 +1,38 @@
+# Шаблон конфигурации Alertmanager для Telegram-уведомлений.
+#
+# 1. Создать бота-нотификатора у @BotFather (ОТДЕЛЬНЫЙ от основного бота).
+# 2. Добавить его в приватный чат админов, взять `chat_id` через /getUpdates.
+# 3. Скопировать этот файл в alertmanager.yml, заменить плейсхолдеры.
+# 4. Перезапустить: docker compose --profile observability restart alertmanager.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "telegram-admins"
+  group_by: ["alertname", "component"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+  routes:
+    - matchers: [severity="page"]
+      receiver: "telegram-admins"
+      group_wait: 10s
+      repeat_interval: 30m
+
+receivers:
+  - name: "telegram-admins"
+    telegram_configs:
+      - bot_token: "REPLACE_WITH_ALERT_BOT_TOKEN"
+        chat_id: 0            # REPLACE_WITH_ADMIN_CHAT_ID
+        parse_mode: ""
+        message: |
+          {{ range .Alerts }}[{{ .Labels.severity | toUpper }}] {{ .Labels.alertname }}
+          {{ .Annotations.summary }}
+          {{ if .Annotations.runbook }}Runbook: {{ .Annotations.runbook }}{{ end }}
+          {{ end }}
+
+inhibit_rules:
+  - source_matchers: [severity="page"]
+    target_matchers: [severity="warn"]
+    equal: ["alertname"]

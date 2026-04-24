@@ -53,6 +53,10 @@ dev = [
     "mypy>=1.11",
     "import-linter>=2.0",
     "pre-commit>=3.8",
+    # security & loadtest (Этап 7)
+    "bandit[toml]>=1.7",
+    "pip-audit>=2.7",
+    "locust>=2.31",
 ]
 
 [build-system]
@@ -142,6 +146,14 @@ markers = [
     "e2e: end-to-end tests through bot dispatcher",
     "slow: slow tests (property-based, load-ish)",
 ]
+
+# --------- bandit ---------
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", ".venv"]
+# B101 — assert — разрешено в тестах (но у нас в src всё равно нет).
+# B608 проверяет f-string SQL в raw text(); наши raw SQL используют именованные
+# параметры (:name), bandit это понимает.
+skips = ["B101"]
 
 # --------- coverage ---------
 [tool.coverage.run]

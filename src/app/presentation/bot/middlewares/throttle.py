@@ -13,6 +13,7 @@ from redis.asyncio import Redis
 
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.core.metrics import BOT_RATE_LIMIT_HITS
 from app.infrastructure.redis.token_bucket import TokenBucket
 from app.presentation.bot.texts.ru import t
 
@@ -46,6 +47,7 @@ class ThrottleMiddleware(BaseMiddleware):
         if wait == 0.0:
             return await handler(event, data)
 
+        BOT_RATE_LIMIT_HITS.labels(scope="user").inc()
         # превышен — тихий drop с одноразовым предупреждением
         async with container() as req:
             redis = await req.get(Redis)

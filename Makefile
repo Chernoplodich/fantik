@@ -22,6 +22,34 @@ rebuild: ## Пересобрать образ без кэша
 up: ## Поднять стек в фоне
 	$(COMPOSE) up -d
 
+.PHONY: up-obs
+up-obs: ## Поднять стек + observability (prometheus + grafana + alertmanager)
+	$(COMPOSE) --profile observability up -d
+
+.PHONY: smoke
+smoke: ## Post-deploy smoke: /healthz, /readyz, /metrics по всем процессам
+	bash scripts/smoke.sh
+
+.PHONY: load-start
+load-start: ## Load-тест: 1000 /start за 60 сек (fake-tg + locust)
+	$(COMPOSE) --profile loadtest up -d fake-tg
+	TG_API_BASE=http://localhost:9999 $(COMPOSE) up -d bot
+	uv run locust -f tests/load/load_start.py --headless -u 1000 -r 50 -t 60s \
+	  --host http://localhost:8080 --csv tests/load/out/start
+
+.PHONY: load-reading
+load-reading: ## Load-тест: 500 юзеров по 10 минут листают
+	$(COMPOSE) --profile loadtest up -d fake-tg
+	TG_API_BASE=http://localhost:9999 $(COMPOSE) up -d bot
+	uv run locust -f tests/load/load_reading.py --headless -u 500 -r 50 -t 10m \
+	  --host http://localhost:8080 --csv tests/load/out/reading
+
+.PHONY: load-broadcast
+load-broadcast: ## Load-тест: рассылка на 50k (python-скрипт, без locust)
+	$(COMPOSE) --profile loadtest up -d fake-tg
+	$(COMPOSE) up -d bot worker worker-broadcast scheduler
+	uv run python -m tests.load.load_broadcast
+
 .PHONY: up-fg
 up-fg: ## Поднять стек в foreground (логи в терминал)
 	$(COMPOSE) up

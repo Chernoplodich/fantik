@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, PhotoSize
@@ -257,8 +257,38 @@ async def on_tags(message: Message, state: FSMContext) -> None:
 
 
 @router.message(CreateFanficStates.waiting_cover, F.photo)
-async def on_cover(message: Message, state: FSMContext) -> None:
+@inject
+async def on_cover(
+    message: Message,
+    state: FSMContext,
+    bot: FromDishka[Bot],
+    settings: FromDishka[Settings],
+) -> None:
     photo: PhotoSize = (message.photo or [])[-1]  # type: ignore[index]
+    from app.infrastructure.telegram.cover_validator import (
+        CoverError,
+        validate_cover,
+    )
+
+    res = await validate_cover(
+        bot, photo.file_id, max_size_bytes=settings.cover_max_size_bytes
+    )
+    if not res.ok:
+        if res.error is CoverError.TOO_LARGE:
+            max_mb = settings.cover_max_size_bytes // (1024 * 1024)
+            await message.answer(
+                f"Обложка слишком большая (>{max_mb} МБ). Сожми или загрузи другую."
+            )
+        elif res.error is CoverError.BAD_FORMAT:
+            await message.answer(
+                "Поддерживаются только обложки в формате JPEG или PNG. Загрузи другую."
+            )
+        else:
+            await message.answer(
+                "Не получилось обработать обложку. Попробуй ещё раз."
+            )
+        return
+
     await state.update_data(
         cover_file_id=photo.file_id,
         cover_file_unique_id=photo.file_unique_id,

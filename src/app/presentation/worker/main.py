@@ -12,17 +12,25 @@ import sys
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.sentry import init_sentry
 
 # Регистрация задач: при импорте этих модулей их `@broker.task`-декораторы
 # добавляют таски в broker.tasks.
 from app.infrastructure.tasks import (
     broadcast_scheduler,  # noqa: F401
     indexing,  # noqa: F401
+    metrics_refresh,  # noqa: F401
     notifications,  # noqa: F401
     outbox_dispatcher,  # noqa: F401
     repagination,  # noqa: F401
 )
 from app.infrastructure.tasks.broker import broker  # noqa: F401 (re-exported for CLI)
+from app.presentation.worker._metrics_bootstrap import start_worker_metrics
+
+# При импорте taskiq-CLI модуля (уже в taskiq-process после execvp) поднимаем
+# /metrics endpoint и инициализируем Sentry.
+init_sentry(get_settings(), component="worker")
+start_worker_metrics()
 
 
 def _run() -> None:
@@ -42,6 +50,7 @@ def _run() -> None:
             "app.infrastructure.tasks.notifications",
             "app.infrastructure.tasks.outbox_dispatcher",
             "app.infrastructure.tasks.broadcast_scheduler",
+            "app.infrastructure.tasks.metrics_refresh",
             "--log-level",
             get_settings().log_level,
         ],

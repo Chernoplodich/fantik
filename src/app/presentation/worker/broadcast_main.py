@@ -13,10 +13,15 @@ import sys
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.sentry import init_sentry
 
 # Регистрация task'ов broadcast'а — импорт активирует @broadcast_broker.task.
 from app.infrastructure.tasks import broadcast  # noqa: F401
 from app.infrastructure.tasks.broker import broadcast_broker  # noqa: F401
+from app.presentation.worker._metrics_bootstrap import start_worker_metrics
+
+init_sentry(get_settings(), component="worker-broadcast")
+start_worker_metrics()
 
 
 def _run() -> None:

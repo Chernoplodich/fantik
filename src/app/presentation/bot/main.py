@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import signal
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.config import RunMode, Settings
 from app.core.di import build_container
 from app.core.logging import get_logger, setup_logging
+from app.core.sentry import init_sentry
 from app.infrastructure.redis.pool import build_redis_fsm_pool
 from app.presentation.bot.health import build_health_app
 from app.presentation.bot.middlewares.ban_check import BanCheckMiddleware
@@ -162,9 +164,18 @@ async def _run_webhook(
     await site.start()
     log.info("webhook_listening", host=settings.webhook_host, port=settings.webhook_port)
     try:
-        # Блокируемся навсегда до SIGTERM
+        # Блокируемся до SIGTERM/SIGINT. Docker compose stop шлёт SIGTERM;
+        # Event + loop.add_signal_handler — каноничный graceful-shutdown.
         stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(sig, stop.set)
+            except NotImplementedError:
+                # Windows / docker exec без tty — сигналы не поддерживаются.
+                pass
         await stop.wait()
+        log.info("bot_shutdown_signal")
     finally:
         await runner.cleanup()
 
@@ -191,6 +202,7 @@ async def main() -> None:
     container = build_container()
     settings = await container.get(Settings)
     setup_logging(settings)
+    init_sentry(settings, component="bot")
     log.info("bot_init", env=settings.app_env.value)
 
     # Seed админы до старта хэндлеров

@@ -19,18 +19,26 @@ services:
       - ./alembic.ini:/app/alembic.ini:cached
     environment:
       LOG_LEVEL: DEBUG
+    # В dev пробрасываем /metrics на хост, чтобы smoke.sh и Grafana
+    # (при проверке вручную без observability-профиля) могли дёрнуть.
+    ports:
+      - "8082:8082"
 
   worker-broadcast:
     volumes:
       - ./src:/app/src:cached
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
+    ports:
+      - "8083:8083"
 
   scheduler:
     volumes:
       - ./src:/app/src:cached
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
+    ports:
+      - "8084:8084"
 
   migrate:
     volumes:

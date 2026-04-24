@@ -10,6 +10,7 @@ import msgpack
 from redis.asyncio import Redis
 
 from app.application.search.ports import ISearchCache
+from app.core.metrics import SEARCH_CACHE_HITS, SEARCH_CACHE_MISSES
 
 
 class RedisSearchCache(ISearchCache):
@@ -19,11 +20,15 @@ class RedisSearchCache(ISearchCache):
     async def get(self, key: str) -> object | None:
         raw = await self._r.get(key)
         if raw is None:
+            SEARCH_CACHE_MISSES.inc()
             return None
         try:
-            return msgpack.unpackb(raw, raw=False)
+            value = msgpack.unpackb(raw, raw=False)
         except (msgpack.UnpackException, ValueError):
+            SEARCH_CACHE_MISSES.inc()
             return None
+        SEARCH_CACHE_HITS.inc()
+        return value
 
     async def setex(self, key: str, ttl_s: int, value: object) -> None:
         payload = msgpack.packb(value, use_bin_type=True)

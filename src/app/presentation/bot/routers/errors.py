@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sentry_sdk
 from aiogram import Router
 from aiogram.types import ErrorEvent
 
@@ -17,6 +18,9 @@ router = Router(name="errors")
 async def on_error(event: ErrorEvent) -> bool:
     exc = event.exception
     update = event.update
+    # Доменные ошибки — это валидные «не так сделал», в Sentry не шлём.
+    if not isinstance(exc, DomainError):
+        sentry_sdk.capture_exception(exc)
     log.exception(
         "unhandled_exception",
         exc_type=type(exc).__name__,

@@ -61,9 +61,11 @@ def _hit_to_raw(h: SearchHit) -> dict[str, object]:
 
 def _build_texts(raw: dict[str, object]) -> tuple[str, str, str]:
     """Возвращает (title, description, message_text)."""
+    from app.presentation.bot.display import display_author_nick
+
     fic_id = int(raw.get("fic_id", 0) or 0)
     title = str(raw.get("title") or "") or f"Работа #{fic_id}"
-    author = str(raw.get("author_nick") or "")
+    author = display_author_nick(str(raw.get("author_nick") or "") or None) or ""
     fandom = str(raw.get("fandom_name") or "")
     age = str(raw.get("age_rating") or "")
     likes = int(raw.get("likes_count", 0) or 0)

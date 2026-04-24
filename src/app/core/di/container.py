@@ -136,6 +136,7 @@ from app.application.tracking.ports import ITrackingRepository
 from app.application.tracking.record_event import RecordEventUseCase
 from app.application.users.agree_to_rules import AgreeToRulesUseCase
 from app.application.users.ports import IUserRepository
+from app.application.users.delete_user import DeleteUserUseCase
 from app.application.users.register_user import RegisterUserUseCase
 from app.application.users.set_author_nick import SetAuthorNickUseCase
 from app.core.clock import Clock, SystemClock
@@ -537,6 +538,17 @@ class UseCasesProvider(Provider):
         clock: Clock,
     ) -> AgreeToRulesUseCase:
         return AgreeToRulesUseCase(uow, users, clock)
+
+    @provide
+    def delete_user(
+        self,
+        uow: UnitOfWork,
+        users: IUserRepository,
+        session: AsyncSession,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> DeleteUserUseCase:
+        return DeleteUserUseCase(uow, users, session, audit, clock)
 
     @provide
     def record_event(

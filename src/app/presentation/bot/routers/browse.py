@@ -104,9 +104,12 @@ async def _render_feed(
     if not items:
         body = f"{header}\n\nПока нет работ."
     else:
+        from app.presentation.bot.display import display_author_nick
+
         lines = [header, ""]
         for idx, it in enumerate(items, start=page * _PAGE_SIZE + 1):
-            author = f" — {it.author_nick}" if it.author_nick else ""
+            nick = display_author_nick(it.author_nick)
+            author = f" — {nick}" if nick else ""
             lines.append(
                 f"{idx}. {it.title}{author} · ❤️ {it.likes_count} · 📖 {it.chapters_count} гл."
             )
@@ -220,7 +223,10 @@ async def _save_search_state(state: FSMContext, s: dict[str, object]) -> None:
 def _format_hit(
     i: int, fic_id: int, title: str, author_nick: str | None, fandom_name: str | None, likes: int
 ) -> str:
-    author = f" — {author_nick}" if author_nick else ""
+    from app.presentation.bot.display import display_author_nick
+
+    nick = display_author_nick(author_nick)
+    author = f" — {nick}" if nick else ""
     fandom = f" · {fandom_name}" if fandom_name else ""
     return f"{i}. {title}{author}{fandom} · ❤️ {likes}"
 

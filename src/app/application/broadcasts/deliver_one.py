@@ -26,6 +26,7 @@ from app.application.users.ports import IUserRepository
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.core.metrics import BROADCAST_BUCKET_WAIT, BROADCAST_DELIVERIES
 from app.domain.broadcasts.value_objects import (
     FINAL_DELIVERY_STATUSES,
     BroadcastStatus,
@@ -139,7 +140,11 @@ class DeliverOneUseCase:
         else:
             rate = float(self._settings.broadcast_rate)
             capacity = int(self._settings.broadcast_rate_capacity)
+        import time as _time
+
+        _bucket_start = _time.monotonic()
         await self._bucket.acquire(BROADCAST_BUCKET_KEY, rate, capacity)
+        BROADCAST_BUCKET_WAIT.observe(_time.monotonic() - _bucket_start)
 
         reply_markup: dict[str, Any] | None = None
         if keyboard:
@@ -182,11 +187,13 @@ class DeliverOneUseCase:
             delivery.status = DeliveryStatus.SENT
             delivery.sent_at = self._clock.now()
             delivery.error_code = None
+            BROADCAST_DELIVERIES.labels(status="sent").inc()
             return DeliverOneResult(sent=True, status=DeliveryStatus.SENT)
 
         if isinstance(result, CopyBlocked):
             delivery.status = DeliveryStatus.BLOCKED
             delivery.error_code = "blocked"
+            BROADCAST_DELIVERIES.labels(status="blocked").inc()
             return DeliverOneResult(sent=False, status=DeliveryStatus.BLOCKED)
 
         if isinstance(result, CopyRetryAfter):
@@ -212,6 +219,7 @@ class DeliverOneUseCase:
         max_attempts = int(self._settings.broadcast_delivery_max_attempts)
         if delivery.attempts >= max_attempts:
             delivery.status = DeliveryStatus.FAILED
+            BROADCAST_DELIVERIES.labels(status="failed").inc()
             return DeliverOneResult(sent=False, status=DeliveryStatus.FAILED)
 
         # Сохраним инкремент и поднимем retry.

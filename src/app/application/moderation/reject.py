@@ -19,6 +19,7 @@ from app.application.moderation.ports import (
 from app.application.shared.ports import UnitOfWork
 from app.core.clock import Clock
 from app.core.errors import NotFoundError
+from app.core.metrics import MODERATION_DECISION_LATENCY, MODERATION_DECISIONS
 from app.domain.fanfics.services import entity_validator
 from app.domain.fanfics.value_objects import FicStatus
 from app.domain.moderation.exceptions import (
@@ -151,6 +152,13 @@ class RejectUseCase:
             for ch in pending_chapters:
                 self._uow.record_events(ch.pull_events())
             await self._uow.commit()
+
+            MODERATION_DECISIONS.labels(decision="reject").inc()
+            submitted_at = getattr(case, "created_at", None) or getattr(case, "locked_at", None)
+            if submitted_at is not None:
+                MODERATION_DECISION_LATENCY.observe(
+                    max(0.0, (now - submitted_at).total_seconds())
+                )
 
             notify_author_id = fic.author_id
             notify_fic_id = fic.id

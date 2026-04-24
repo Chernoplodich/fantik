@@ -64,6 +64,20 @@ class Settings(BaseSettings):
     health_host: str = "0.0.0.0"
     health_port: int = 8080
     metrics_port: int = 8081
+    # /metrics и /healthz воркеров — поднимаются как aiohttp-сервер рядом с TaskIQ-worker-loop.
+    metrics_port_worker: int = 8082
+    metrics_port_broadcast: int = 8083
+    metrics_port_scheduler: int = 8084
+    health_port_worker: int = 8092
+    health_port_broadcast: int = 8093
+    health_port_scheduler: int = 8094
+
+    # Если задан — aiogram будет ходить сюда вместо api.telegram.org.
+    # Нужен для load-тестов с fake-tg-сервером. В проде всегда пустая строка.
+    tg_api_base: str = ""
+
+    # Валидация обложек.
+    cover_max_size_bytes: int = 5 * 1024 * 1024
 
     @field_validator("admin_tg_ids", mode="before")
     @classmethod

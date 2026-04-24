@@ -11,15 +11,21 @@ import sys
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.sentry import init_sentry
 
 # Регистрация задач с `schedule=[...]` — LabelScheduleSource читает их.
 from app.infrastructure.tasks import (
     broadcast_scheduler,  # noqa: F401
     indexing,  # noqa: F401
+    metrics_refresh,  # noqa: F401
     outbox_dispatcher,  # noqa: F401
     repagination,  # noqa: F401
 )
 from app.infrastructure.tasks.broker import scheduler  # noqa: F401 (re-exported for CLI)
+from app.presentation.worker._metrics_bootstrap import start_worker_metrics
+
+init_sentry(get_settings(), component="scheduler")
+start_worker_metrics()
 
 
 def _run() -> None:

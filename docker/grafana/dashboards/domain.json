@@ -1,0 +1,101 @@
+{
+  "uid": "fantik-domain",
+  "title": "Fantik — Domain",
+  "tags": ["fantik", "domain"],
+  "timezone": "",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Moderation queue depth by kind",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "fantik-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (moderation_queue_depth)",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Moderation decision latency p50/p95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "fantik-prometheus" },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum(rate(moderation_decision_latency_seconds_bucket[1h])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum(rate(moderation_decision_latency_seconds_bucket[1h])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Publications (fanfics + chapters)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "fantik-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(fanfics_published_total[1d]))",
+          "legendFormat": "fanfics/day"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(chapters_published_total[1d]))",
+          "legendFormat": "chapters/day"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Active users (24h / total)",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "fantik-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "active_users_24h", "legendFormat": "active_24h" },
+        { "refId": "B", "expr": "users_total", "legendFormat": "total" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Search: queries rate & cache hit ratio",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "fantik-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (backend) (rate(search_queries_total[5m]))",
+          "legendFormat": "qps {{backend}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(search_cache_hits_total[5m])) / clamp_min(sum(rate(search_cache_hits_total[5m]) + rate(search_cache_misses_total[5m])), 1)",
+          "legendFormat": "cache hit ratio"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    }
+  ]
+}

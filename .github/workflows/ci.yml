@@ -28,6 +28,13 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run mypy src
       - run: uv run lint-imports
+      - name: Security — bandit
+        run: uv run bandit -r src -c pyproject.toml -q
+      - name: Security — pip-audit
+        # pip-audit может упасть на известных, но пока неприменимых CVE —
+        # делаем non-blocking (видно в логе, но CI не красный).
+        continue-on-error: true
+        run: uv run pip-audit --strict
 
   test:
     name: Tests
@@ -94,3 +101,36 @@ jobs:
         with:
           files: coverage.xml
           fail_ci_if_error: false
+
+  smoke:
+    name: Smoke (docker compose)
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    env:
+      APP_ENV: dev
+      BOT_TOKEN: "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN"
+      ADMIN_TG_IDS: "1"
+      POSTGRES_PASSWORD: "ci"
+      MEILI_MASTER_KEY: "ci-secret-32-chars-or-more-padding"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker compose build bot
+      - name: Up (bot + workers + deps)
+        run: docker compose up -d postgres redis meilisearch migrate bot worker worker-broadcast scheduler
+      - name: Wait for readiness
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/healthz; then exit 0; fi
+            sleep 3
+          done
+          docker compose logs bot worker worker-broadcast scheduler
+          exit 1
+      - name: Run smoke
+        run: bash scripts/smoke.sh
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+      - name: Down
+        if: always()
+        run: docker compose down -v

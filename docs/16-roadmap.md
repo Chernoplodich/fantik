@@ -107,16 +107,16 @@
 
 ---
 
-## Этап 7. Hardening (1 неделя)
+## Этап 7. Hardening ✅
 
-- [ ] Полное покрытие метриками (Prometheus).
-- [ ] Sentry подключён во всех процессах.
-- [ ] Alertmanager + Telegram-нотификации (опц.).
-- [ ] Нагрузочные тесты `tests/load/`, исправление найденных узких мест.
-- [ ] Security-проход (`pip-audit`, `trivy`).
-- [ ] Recovery drill: восстановление из дампа PG в staging.
-- [ ] Документация README для операционки.
-- [ ] Feature flags для expériментальных функций.
+- [x] Полное покрытие метриками (Prometheus) — `src/app/core/metrics.py`, wiring в middleware/TG-session/TaskIQ/broadcast/moderation/search; периодический `metrics_refresh_tick` для Gauge'ей.
+- [x] Sentry подключён во всех процессах — `src/app/core/sentry.py` + `init_sentry(component=…)` в bot/worker/worker-broadcast/scheduler, PII-scrubbing через `before_send`.
+- [x] Alertmanager + Telegram-нотификации — `docker/prometheus/alerts.yml` (7 правил), `docker/alertmanager/alertmanager.yml.example` (Telegram receiver).
+- [x] Нагрузочные тесты — `tests/load/` + `fake_tg_server.py` + locust-сценарии `load_start` / `load_reading` / `load_broadcast` + compose-profile `loadtest`.
+- [x] Security-проход — `bandit` + `pip-audit` в CI lint job, `.github/dependabot.yml` weekly, `cover_validator.py` (magic bytes + 5 МБ), `DeleteUserUseCase` (`/delete_me`).
+- [x] Recovery drill — `scripts/backup_pg.sh` + `scripts/restore_drill.sh` + `docs/ops/backup.md`.
+- [x] Документация для операционки — `docs/ops/runbook.md` (per-alert actions, эскалация), `scripts/smoke.sh` + CI-job `smoke`.
+- [ ] Feature flags — не реализовано, вынесено в пост-MVP (не блокирует production-readiness).
 
 **Deliverable**: прод-готовый сервис.
 

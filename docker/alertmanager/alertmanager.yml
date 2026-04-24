@@ -1,0 +1,18 @@
+# DEFAULT no-op конфигурация Alertmanager — нужна, чтобы контейнер стартовал
+# на свежем clone проекта. Никуда не шлёт алерты — просто принимает их.
+#
+# Для реальных уведомлений скопируй `alertmanager.yml.example` поверх этого
+# файла и замени BOT_TOKEN / CHAT_ID. См. docs/ops/runbook.md.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "null"
+  group_by: ["alertname"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+
+receivers:
+  - name: "null"

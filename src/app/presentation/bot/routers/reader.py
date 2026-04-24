@@ -90,7 +90,11 @@ async def open_fanfic(
 
     fic = result.fic
     author = await users.get(fic.author_id)
-    caption, caption_entities = build_cover_caption(fic, author.author_nick if author else None)
+    from app.presentation.bot.display import display_author_nick
+
+    caption, caption_entities = build_cover_caption(
+        fic, display_author_nick(author.author_nick if author else None)
+    )
 
     show_subscribe = int(fic.author_id) != int(cb.from_user.id)
     is_subscribed = False

@@ -90,7 +90,7 @@ class BanCheckMiddleware(BaseMiddleware):
 - Chapter text: 1–100 000 UTF-16 units.
 - Количество глав на фик: до 200.
 - Количество тегов на фик: до 30 (5 persona + 5 warning + 20 freeform/theme).
-- Обложка: только фото (JPEG/PNG), ≤ 5 МБ.
+- Обложка: только фото (JPEG/PNG), ≤ 5 МБ. Реализовано в [`src/app/infrastructure/telegram/cover_validator.py`](../src/app/infrastructure/telegram/cover_validator.py): загружаем первые байты из Telegram через `bot.download`, проверяем magic bytes (`\xFF\xD8\xFF` для JPEG, `\x89PNG\r\n\x1a\n` для PNG) и размер. Вызывается из FSM обложек в [`author_create.py`](../src/app/presentation/bot/routers/author_create.py) и [`author_manage.py`](../src/app/presentation/bot/routers/author_manage.py) перед сохранением `cover_file_id`.
 
 ### Нормализация тегов
 
@@ -117,20 +117,22 @@ class BanCheckMiddleware(BaseMiddleware):
 
 ## Право на удаление
 
-Команда `/delete_me`:
+Команда `/delete_me` реализована в [`src/app/application/users/delete_user.py`](../src/app/application/users/delete_user.py) + [`src/app/presentation/bot/routers/profile.py`](../src/app/presentation/bot/routers/profile.py) (FSM `DeleteMeFlow`).
 
 1. Показывает предупреждение: что будет удалено, что — анонимизировано.
 2. Подтверждение.
-3. Use case `DeleteUserUseCase`:
-   - `author_nick` → `deleted_<hash8>`.
+3. `DeleteUserUseCase` (одна транзакция):
+   - `author_nick` → `deleted_<sha256(tg_id)[:8]>`.
    - `username`, `first_name`, `last_name` → NULL.
    - `utm_source_code_id` → NULL.
-   - Все черновики (draft, rejected, revising) — DELETE.
-   - Опубликованные работы — НЕ удаляются (контракт с другими читателями), но автор-поле показывается как «Удалённый пользователь». Комментарии/подписки на автора — отписываются.
-   - `bookmarks`, `likes`, `reading_progress`, `subscriptions`, `reports` — DELETE.
-   - `tracking_events.user_id` → NULL (или строка-плейсхолдер).
-   - `audit_log` — сохраняется (ригоризм для безопасности).
-4. `banned_at = now()`, `banned_reason = "self_deleted"` — предохраняет от повторной регистрации под тем же `tg_id` с теми же данными.
+   - Все работы со статусом IN (`draft`, `rejected`, `revising`) — DELETE (каскадно на chapters/pages/versions).
+   - Опубликованные работы — НЕ удаляются. В каталоге/reader/inline-search подпись автора подменяется на `«Удалённый пользователь»` через [`src/app/presentation/bot/display.py`](../src/app/presentation/bot/display.py) (`display_author_nick`).
+   - `bookmarks`, `likes`, `reading_progress`, `reads_completed`, `subscriptions` (обе стороны), `reports`, `notifications` — DELETE.
+   - `tracking_events.user_id` → NULL (события остаются для статистики).
+   - `audit_log` — сохраняется + запись `action='user.self_deleted'`.
+4. `banned_at = now()`, `banned_reason = "self_deleted"` — предохраняет от повторной регистрации под тем же `tg_id`.
+
+Повторный вызов use-case идемпотентен: на уже помеченном `banned_reason='self_deleted'` — no-op.
 
 ## Ban и восстановление
 

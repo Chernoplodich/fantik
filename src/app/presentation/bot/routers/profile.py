@@ -6,9 +6,10 @@ from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka, inject
 
+from app.application.users.delete_user import DeleteUserCommand, DeleteUserUseCase
 from app.application.users.ports import IUserRepository
 from app.application.users.set_author_nick import (
     SetAuthorNickCommand,
@@ -19,6 +20,7 @@ from app.domain.shared.types import UserId
 from app.domain.users.exceptions import AuthorNickAlreadyTakenError
 from app.domain.users.value_objects import Role
 from app.presentation.bot.fsm.states.onboarding import AuthorNickFlow
+from app.presentation.bot.fsm.states.profile import DeleteMeFlow
 from app.presentation.bot.keyboards.main_menu import (
     build_main_menu_kb,
     build_profile_kb,
@@ -140,6 +142,88 @@ async def on_nick_submitted(
         parse_mode="HTML",
         reply_markup=build_main_menu_kb(role=role, is_author=True),
     )
+
+
+# ---------- /delete_me (self-deletion по запросу пользователя) ----------
+
+_DELETE_WARNING = (
+    "⚠️ <b>Удаление аккаунта</b>\n\n"
+    "Будет удалено:\n"
+    "• Все твои черновики и отклонённые работы (безвозвратно)\n"
+    "• Закладки, лайки, прогресс чтения, подписки\n"
+    "• Жалобы, которые ты оставлял\n\n"
+    "Будет обезличено:\n"
+    "• Опубликованные работы — останутся в каталоге под подписью «Удалённый пользователь»\n"
+    "• Имя, фамилия, @username — очистим\n"
+    "• Ник автора — заменим на <code>deleted_xxxxxxxx</code>\n\n"
+    "После удаления войти под тем же Telegram-ID заново <b>нельзя</b> — аккаунт останется забанен.\n\n"
+    "Подтверждаешь?"
+)
+
+
+def _build_delete_confirm_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="❌ Да, удалить навсегда",
+                    callback_data="profile:delete_me:confirm",
+                )
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="profile:delete_me:cancel")],
+        ]
+    )
+
+
+@router.message(Command("delete_me"))
+async def delete_me_entry(message: Message, state: FSMContext) -> None:
+    if message.from_user is None:
+        return
+    await state.set_state(DeleteMeFlow.confirming)
+    await message.answer(
+        _DELETE_WARNING, parse_mode="HTML", reply_markup=_build_delete_confirm_kb()
+    )
+
+
+@router.callback_query(
+    DeleteMeFlow.confirming, F.data == "profile:delete_me:cancel"
+)
+async def delete_me_cancel(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    if cb.message is not None:
+        try:
+            await cb.message.edit_text("Удаление отменено.")
+        except TelegramBadRequest:
+            pass
+    await cb.answer("Отменено")
+
+
+@router.callback_query(
+    DeleteMeFlow.confirming, F.data == "profile:delete_me:confirm"
+)
+@inject
+async def delete_me_confirm(
+    cb: CallbackQuery,
+    state: FSMContext,
+    delete_user: FromDishka[DeleteUserUseCase],
+) -> None:
+    if cb.from_user is None:
+        await cb.answer()
+        return
+    await state.clear()
+    try:
+        await delete_user(DeleteUserCommand(user_id=cb.from_user.id))
+    except Exception:
+        await cb.answer("Не удалось удалить. Попробуй ещё раз или напиши админу.", show_alert=True)
+        raise
+    if cb.message is not None:
+        try:
+            await cb.message.edit_text(
+                "Аккаунт удалён. Прощай. Опубликованные работы останутся в каталоге под подписью «Удалённый пользователь»."
+            )
+        except TelegramBadRequest:
+            pass
+    await cb.answer()
 
 
 # ---------- утилиты ----------

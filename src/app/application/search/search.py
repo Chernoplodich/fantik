@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.application.search.dto import SearchCommand, SearchResult
 from app.application.search.ports import ISearchFallback, ISearchIndex
 from app.core.logging import get_logger
+from app.core.metrics import SEARCH_QUERIES
 
 log = get_logger(__name__)
 
@@ -19,13 +20,16 @@ class SearchUseCase:
             return await self._run_fallback(cmd)
 
         try:
-            return await self._primary.search(cmd)
+            result = await self._primary.search(cmd)
+            SEARCH_QUERIES.labels(backend="meili").inc()
+            return result
         except Exception as e:
             log.warning("search_primary_failed", error=str(e))
             return await self._run_fallback(cmd)
 
     async def _run_fallback(self, cmd: SearchCommand) -> SearchResult:
         hits = await self._fallback.search(cmd.q, limit=cmd.limit, offset=cmd.offset)
+        SEARCH_QUERIES.labels(backend="pg").inc()
         return SearchResult(
             hits=hits,
             total=len(hits),

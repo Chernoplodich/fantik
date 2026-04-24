@@ -1,0 +1,77 @@
+groups:
+  - name: fantik-bot
+    interval: 30s
+    rules:
+      - alert: BotHighErrorRate
+        expr: sum(rate(bot_handler_errors_total[5m])) / clamp_min(sum(rate(bot_updates_total[5m])), 1) > 0.1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Bot error rate > 10% for 5m"
+          runbook: "docs/ops/runbook.md#bothigherrorrate"
+
+      - alert: BotHandlerLatencyP95High
+        expr: histogram_quantile(0.95, sum(rate(bot_handler_duration_seconds_bucket[5m])) by (le, handler)) > 1.0
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Handler p95 > 1s for 10m"
+
+      - alert: TGApiBadResponses
+        expr: sum(rate(bot_tg_api_calls_total{result="error"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Telegram API errors > 1 rps for 5m"
+          runbook: "docs/ops/runbook.md#tgapibadresponses"
+
+  - name: fantik-moderation
+    interval: 60s
+    rules:
+      - alert: ModerationQueueTooDeep
+        expr: sum(moderation_queue_depth) > 50
+        for: 60m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Moderation queue > 50 open cases for 1h"
+          runbook: "docs/ops/runbook.md#moderationqueuetoodeep"
+
+  - name: fantik-broadcast
+    interval: 30s
+    rules:
+      - alert: BroadcastStalled
+        # Есть активные рассылки (deliveries всё ещё pending), но sent-rate 0 за 5m.
+        expr: |
+          (sum(rate(broadcast_deliveries_total{status="sent"}[5m])) == 0)
+          and
+          (sum(rate(broadcast_deliveries_total[10m])) > 0)
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Broadcast stalled: 0 successful deliveries for 5m while queue is draining"
+          runbook: "docs/ops/runbook.md#broadcaststalled"
+
+  - name: fantik-reliability
+    interval: 60s
+    rules:
+      - alert: OutboxLagHigh
+        expr: outbox_oldest_pending_age_seconds > 300
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Outbox oldest pending > 5 minutes — dispatcher stuck"
+          runbook: "docs/ops/runbook.md#outboxlaghigh"
+
+      - alert: WorkerQueueBacklog
+        expr: max(worker_queue_depth) > 1000
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "TaskIQ queue depth > 1000 for 10m — consumers can't keep up"
