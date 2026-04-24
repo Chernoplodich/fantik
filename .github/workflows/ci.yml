@@ -15,7 +15,7 @@ jobs:
     name: Lint & type-check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v3
         with:
           version: "0.4.27"
@@ -80,7 +80,7 @@ jobs:
       MEILI_URL: http://localhost:7700
       MEILI_MASTER_KEY: ci-secret-32-chars-or-more-padding
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v3
         with:
           version: "0.4.27"
@@ -113,7 +113,7 @@ jobs:
       POSTGRES_PASSWORD: "ci"
       MEILI_MASTER_KEY: "ci-secret-32-chars-or-more-padding"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build image
         run: docker compose build bot
       - name: Up (bot + workers + deps)
