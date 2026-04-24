@@ -96,7 +96,7 @@ jobs:
           exit 1
       - run: uv run alembic upgrade head
       - run: uv run pytest --cov=src --cov-report=xml
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v6
         if: always()
         with:
           files: coverage.xml
