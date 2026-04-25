@@ -27,9 +27,7 @@ class MetricsTaskMiddleware(TaskiqMiddleware):
             WORKER_TASK_RETRIES.labels(task=message.task_name).inc()
         return message
 
-    async def post_execute(
-        self, message: TaskiqMessage, result: TaskiqResult[Any]
-    ) -> None:
+    async def post_execute(self, message: TaskiqMessage, result: TaskiqResult[Any]) -> None:
         raw = message.labels.get("__metrics_start")
         if raw is None:
             return

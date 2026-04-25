@@ -25,6 +25,7 @@
   "fandom_id": 1,
   "fandom_name": "Гарри Поттер",
   "fandom_aliases": ["HP", "Потериана"],
+  "fandom_category": "books",
   "age_rating": "R",
   "age_rating_order": 4,
   "tags": ["AU", "Ангст", "Хэд-канон"],
@@ -57,6 +58,8 @@
   ],
   "filterableAttributes": [
     "fandom_id",
+    "fandom_name",
+    "fandom_category",
     "age_rating",
     "age_rating_order",
     "tags",
@@ -107,6 +110,17 @@
 
 ### `chapters_text_excerpt`
 Брать не весь текст всех глав — индекс вырастет непропорционально, а смысла поиска по телу главы среди фанфиков обычно нет. Склейка: `join(chapter.text[:5000] for first 3 chapters)`, обрезанная до 20 000 символов. Это позволит искать по цитатам первых глав.
+
+## UI-пикер фандомов (Этап 8)
+
+Один реюзабельный двухступенчатый пикер используется и в мастере создания фика, и в фильтре поиска (`src/app/presentation/bot/keyboards/fandom_picker.py`):
+
+1. **Корень** — кнопки 11 категорий (anime/books/films/series/cartoons/comics/games/musicals/rpf/originals/other) + `🔍 Найти по названию`. В create-режиме дополнительно `➕ Предложить свой`. В фильтре поиска — счётчик «Готово (выбрано: N)».
+2. **Внутри категории** — пагинация по 10 фандомов на страницу, multi/single-select. Чекбоксы `✅/⬜` рисуются только в multi-режиме (фильтр).
+3. **Поиск по тексту** — кнопка `🔍 Найти по названию` переводит юзера в FSM-state ввода подстроки. Бэкенд: `IReferenceReader.search_fandoms(query, limit, category=None)` → PG ILIKE по `name` + EXISTS unnest(`aliases`) ILIKE, prefix-match priority. Префиксный матч по `name` ставится выше substring-матча. Минимум 2 символа.
+4. **Кастомные фандомы** — только в create-flow. Кнопка `➕ Предложить свой` запускает FSM `name → category` → создаёт `fandom_proposals(status='pending')` (см. `docs/03-data-model.md`). Анти-дубль через partial-unique индекс. Заявка не блокирует создание фика — автор может пока выбрать любой существующий фандом.
+
+Админ обрабатывает заявки в разделе `/admin → 📋 Заявки на фандом` (роутер `admin_proposals.py`). Approve внутри транзакции вызывает `CreateFandomUseCase` и шлёт уведомление автору. Reject — с обязательным запросом причины (FSM `FandomProposalReviewFlow`).
 
 ## API поиска
 

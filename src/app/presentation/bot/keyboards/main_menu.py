@@ -25,11 +25,29 @@ def build_main_menu_kb(*, role: Role, is_author: bool) -> InlineKeyboardMarkup:
     else:
         b.button(text="✍️ Стать автором", callback_data="menu:become_author")
     b.button(text="👤 Профиль", callback_data="menu:profile")
+
+    # mod+admin: считаем количество служебных кнопок и кладём их в один ряд.
+    # Базовая раскладка: 2 каталог+полка, 2 авторские (или 1 «Стать автором»),
+    # 1 профиль. Чтобы корректно работало для USER (без авторства) — учитываем
+    # фактическое количество кнопок до служебных.
+    sizes: list[int] = []
+    sizes.append(2)  # каталог + полка
+    if is_author:
+        sizes.append(2)  # мои работы + новая работа
+    else:
+        sizes.append(1)  # «Стать автором»
+    sizes.append(1)  # профиль
+
+    extras = 0
     if role in (Role.MODERATOR, Role.ADMIN):
         b.button(text="🛡 Модерация", callback_data="menu:mod")
-    if role == Role.ADMIN:
+        extras += 1
+    if role is Role.ADMIN:
         b.button(text="⚙️ Админ", callback_data="menu:admin")
-    b.adjust(2, 2, 1, 1, 1)
+        extras += 1
+    if extras:
+        sizes.append(extras)  # обе вместе одной строкой при ADMIN, одна — при MODERATOR
+    b.adjust(*sizes)
     return b.as_markup()
 
 

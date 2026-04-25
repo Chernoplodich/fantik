@@ -72,17 +72,13 @@ class IBroadcastRepository(Protocol):
         """Сохранить состояние (UPDATE по id)."""
         ...
 
-    async def list_by_creator(
-        self, *, created_by: UserId, limit: int = 20
-    ) -> list[Broadcast]: ...
+    async def list_by_creator(self, *, created_by: UserId, limit: int = 20) -> list[Broadcast]: ...
 
     async def list_by_status(
         self, statuses: list[BroadcastStatus], limit: int = 100
     ) -> list[Broadcast]: ...
 
-    async def scan_ready_to_run(
-        self, *, now: datetime, limit: int = 10
-    ) -> list[BroadcastId]:
+    async def scan_ready_to_run(self, *, now: datetime, limit: int = 10) -> list[BroadcastId]:
         """Атомарно взять scheduled-рассылки, у которых scheduled_at <= now.
 
         Переводит их в `running` (UPDATE ... RETURNING id) через CTE с
@@ -90,15 +86,11 @@ class IBroadcastRepository(Protocol):
         """
         ...
 
-    async def update_stats(
-        self, *, broadcast_id: BroadcastId, stats: dict[str, int]
-    ) -> None: ...
+    async def update_stats(self, *, broadcast_id: BroadcastId, stats: dict[str, int]) -> None: ...
 
 
 class IDeliveryRepository(Protocol):
-    async def upsert_pending(
-        self, *, broadcast_id: BroadcastId, user_ids: list[UserId]
-    ) -> int:
+    async def upsert_pending(self, *, broadcast_id: BroadcastId, user_ids: list[UserId]) -> int:
         """Batch INSERT ... ON CONFLICT (broadcast_id, user_id) DO NOTHING.
 
         Возвращает число реально вставленных строк.
@@ -111,9 +103,7 @@ class IDeliveryRepository(Protocol):
 
     async def save(self, delivery: Delivery) -> None: ...
 
-    async def count_by_status(
-        self, broadcast_id: BroadcastId
-    ) -> dict[DeliveryStatus, int]: ...
+    async def count_by_status(self, broadcast_id: BroadcastId) -> dict[DeliveryStatus, int]: ...
 
     def iter_user_ids_by_status(
         self,

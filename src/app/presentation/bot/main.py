@@ -26,6 +26,7 @@ from app.presentation.bot.middlewares.throttle import ThrottleMiddleware
 from app.presentation.bot.middlewares.user_upsert import UserUpsertMiddleware
 from app.presentation.bot.routers import admin_broadcast as admin_broadcast_router
 from app.presentation.bot.routers import admin_fandoms as admin_fandoms_router
+from app.presentation.bot.routers import admin_proposals as admin_proposals_router
 from app.presentation.bot.routers import admin_stats as admin_stats_router
 from app.presentation.bot.routers import admin_tags as admin_tags_router
 from app.presentation.bot.routers import admin_tracking as admin_tracking_router
@@ -80,6 +81,7 @@ def _build_dispatcher(settings: Settings, fsm_pool: ConnectionPool) -> Dispatche
     dp.include_router(admin_tracking_router.router)
     dp.include_router(admin_stats_router.router)
     dp.include_router(admin_fandoms_router.router)
+    dp.include_router(admin_proposals_router.router)
     dp.include_router(admin_tags_router.router)
     dp.include_router(menu_router.router)
     return dp

@@ -133,10 +133,7 @@ class DeleteUserUseCase:
                 )
             # Подписки обоих направлений (юзер как подписчик и как автор).
             await self._s.execute(
-                text(
-                    "DELETE FROM subscriptions "
-                    "WHERE subscriber_id = :uid OR author_id = :uid"
-                ),
+                text("DELETE FROM subscriptions WHERE subscriber_id = :uid OR author_id = :uid"),
                 {"uid": int(user_id)},
             )
 

@@ -19,9 +19,7 @@ from tests.load.conftest import make_update_start
 
 def _webhook_path() -> str:
     base = os.environ.get("WEBHOOK_PATH", "/webhook")
-    token = os.environ.get(
-        "BOT_TOKEN", "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN"
-    )
+    token = os.environ.get("BOT_TOKEN", "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN")
     token_hash = hashlib.sha256(token.encode()).hexdigest()[:32]
     return f"{base.rstrip('/')}/{token_hash}"
 
@@ -49,7 +47,9 @@ def _assert_sla(environment: object, **_: object) -> None:
         return
     aggregated = stats.total
     p95 = aggregated.get_response_time_percentile(0.95)
-    err_ratio = (aggregated.num_failures / aggregated.num_requests) if aggregated.num_requests else 0.0
+    err_ratio = (
+        (aggregated.num_failures / aggregated.num_requests) if aggregated.num_requests else 0.0
+    )
     if p95 is not None and p95 > 200:
         print(f"SLA FAIL: p95={p95}ms > 200ms")
         environment.process_exit_code = 1  # type: ignore[attr-defined]

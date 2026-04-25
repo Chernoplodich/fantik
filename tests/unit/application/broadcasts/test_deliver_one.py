@@ -82,9 +82,9 @@ class FakeDeliveryRepo(IDeliveryRepository):
         return 0
 
     async def get_for_update(self, *, broadcast_id, user_id):  # type: ignore[no-untyped-def]
-        if int(broadcast_id) == int(self.delivery.broadcast_id) and int(
-            user_id
-        ) == int(self.delivery.user_id):
+        if int(broadcast_id) == int(self.delivery.broadcast_id) and int(user_id) == int(
+            self.delivery.user_id
+        ):
             return self.delivery
         return None
 
@@ -151,9 +151,7 @@ def _make_broadcast(
     )
 
 
-def _make_delivery(
-    status: DeliveryStatus = DeliveryStatus.PENDING, attempts: int = 0
-) -> Delivery:
+def _make_delivery(status: DeliveryStatus = DeliveryStatus.PENDING, attempts: int = 0) -> Delivery:
     return Delivery(
         broadcast_id=BroadcastId(1),
         user_id=UserId(200),
@@ -209,9 +207,7 @@ def _uc(
 
 @pytest.mark.asyncio
 async def test_copy_ok_marks_sent() -> None:
-    uc, _, deliveries, _users = _uc(
-        _make_broadcast(), _make_delivery(), [CopyOK()]
-    )
+    uc, _, deliveries, _users = _uc(_make_broadcast(), _make_delivery(), [CopyOK()])
     res = await uc(DeliverOneCommand(broadcast_id=1, user_id=200))
     assert res.sent is True
     assert res.status == DeliveryStatus.SENT
@@ -221,9 +217,7 @@ async def test_copy_ok_marks_sent() -> None:
 
 @pytest.mark.asyncio
 async def test_forbidden_marks_blocked() -> None:
-    uc, _, deliveries, users = _uc(
-        _make_broadcast(), _make_delivery(), [CopyBlocked()]
-    )
+    uc, _, deliveries, users = _uc(_make_broadcast(), _make_delivery(), [CopyBlocked()])
     res = await uc(DeliverOneCommand(broadcast_id=1, user_id=200))
     assert res.sent is False
     assert deliveries.delivery.status == DeliveryStatus.BLOCKED
@@ -235,9 +229,7 @@ async def test_forbidden_marks_blocked() -> None:
 
 @pytest.mark.asyncio
 async def test_retry_after_raises_retry_immediate() -> None:
-    uc, _, _, _ = _uc(
-        _make_broadcast(), _make_delivery(), [CopyRetryAfter(seconds=5.0)]
-    )
+    uc, _, _, _ = _uc(_make_broadcast(), _make_delivery(), [CopyRetryAfter(seconds=5.0)])
     with pytest.raises(DeliveryRetryRequestedError) as exc_info:
         await uc(DeliverOneCommand(broadcast_id=1, user_id=200))
     assert exc_info.value.increment_attempts is False
@@ -300,8 +292,6 @@ async def test_cancelled_broadcast_marks_failed_cancelled() -> None:
 
 @pytest.mark.asyncio
 async def test_allow_paid_broadcast_uses_paid_rate() -> None:
-    uc, bot, _, _users = _uc(
-        _make_broadcast(), _make_delivery(), [CopyOK()], allow_paid=True
-    )
+    uc, bot, _, _users = _uc(_make_broadcast(), _make_delivery(), [CopyOK()], allow_paid=True)
     await uc(DeliverOneCommand(broadcast_id=1, user_id=200))
     assert bot.calls[0]["allow_paid_broadcast"] is True

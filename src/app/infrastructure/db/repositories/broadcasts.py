@@ -91,9 +91,7 @@ class BroadcastRepository(IBroadcastRepository):
         _apply_domain_to_model(m, broadcast)
         await self._s.flush()
 
-    async def list_by_creator(
-        self, *, created_by: UserId, limit: int = 20
-    ) -> list[Broadcast]:
+    async def list_by_creator(self, *, created_by: UserId, limit: int = 20) -> list[Broadcast]:
         stmt = (
             select(BroadcastModel)
             .where(BroadcastModel.created_by == int(created_by))
@@ -117,9 +115,7 @@ class BroadcastRepository(IBroadcastRepository):
         rows = (await self._s.execute(stmt)).scalars().all()
         return [_model_to_domain(r) for r in rows]
 
-    async def scan_ready_to_run(
-        self, *, now: datetime, limit: int = 10
-    ) -> list[BroadcastId]:
+    async def scan_ready_to_run(self, *, now: datetime, limit: int = 10) -> list[BroadcastId]:
         """Атомарно взять scheduled-рассылки, перевести в running.
 
         CTE + SKIP LOCKED: параллельные scheduler-тики не возьмут одну и ту же.
@@ -146,9 +142,7 @@ class BroadcastRepository(IBroadcastRepository):
         rows = await self._s.execute(stmt, {"now": now, "lim": limit})
         return [BroadcastId(int(r[0])) for r in rows.all()]
 
-    async def update_stats(
-        self, *, broadcast_id: BroadcastId, stats: dict[str, int]
-    ) -> None:
+    async def update_stats(self, *, broadcast_id: BroadcastId, stats: dict[str, int]) -> None:
         m = await self._s.get(BroadcastModel, int(broadcast_id))
         if m is None:
             return
@@ -159,9 +153,7 @@ class DeliveryRepository(IDeliveryRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    async def upsert_pending(
-        self, *, broadcast_id: BroadcastId, user_ids: list[UserId]
-    ) -> int:
+    async def upsert_pending(self, *, broadcast_id: BroadcastId, user_ids: list[UserId]) -> int:
         if not user_ids:
             return 0
         rows = [
@@ -195,12 +187,9 @@ class DeliveryRepository(IDeliveryRepository):
         return self._to_domain(m)
 
     async def save(self, delivery: Delivery) -> None:
-        stmt = (
-            select(DeliveryModel)
-            .where(
-                DeliveryModel.broadcast_id == int(delivery.broadcast_id),
-                DeliveryModel.user_id == int(delivery.user_id),
-            )
+        stmt = select(DeliveryModel).where(
+            DeliveryModel.broadcast_id == int(delivery.broadcast_id),
+            DeliveryModel.user_id == int(delivery.user_id),
         )
         m = (await self._s.execute(stmt)).scalar_one_or_none()
         if m is None:
@@ -210,9 +199,7 @@ class DeliveryRepository(IDeliveryRepository):
         m.error_code = delivery.error_code
         m.sent_at = delivery.sent_at
 
-    async def count_by_status(
-        self, broadcast_id: BroadcastId
-    ) -> dict[DeliveryStatus, int]:
+    async def count_by_status(self, broadcast_id: BroadcastId) -> dict[DeliveryStatus, int]:
         stmt = text(
             """
             SELECT status, count(*)

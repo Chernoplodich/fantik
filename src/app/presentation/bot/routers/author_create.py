@@ -27,6 +27,10 @@ from app.application.fanfics.create_draft import (
     CreateDraftUseCase,
 )
 from app.application.fanfics.ports import IReferenceReader
+from app.application.reference.proposals import (
+    SubmitFandomProposalCommand,
+    SubmitFandomProposalUseCase,
+)
 from app.core.config import Settings
 from app.core.errors import DomainError, ValidationError
 from app.domain.fanfics.value_objects import (
@@ -39,16 +43,25 @@ from app.domain.fanfics.value_objects import (
 from app.presentation.bot.callback_data.fanfic import (
     AgeRatingCD,
     FandomPickCD,
+    FandomProposeCategoryCD,
     FanficCD,
 )
+from app.presentation.bot.fandom_categories import category_long_label
 from app.presentation.bot.fsm.states.create_fanfic import CreateFanficStates
 from app.presentation.bot.keyboards.create_fanfic import (
-    FANDOM_PAGE_SIZE,
     build_age_rating_kb,
     build_cancel_kb,
     build_chapter_or_submit_kb,
     build_cover_kb,
-    build_fandom_picker_kb,
+)
+from app.presentation.bot.keyboards.fandom_picker import (
+    FANDOMS_PER_PAGE as PICKER_PAGE_SIZE,
+)
+from app.presentation.bot.keyboards.fandom_picker import (
+    build_categories_kb,
+    build_fandoms_in_category_kb,
+    build_propose_categories_kb,
+    build_search_results_kb,
 )
 from app.presentation.bot.routers._chapter_buffer import (
     append_chunk,
@@ -149,46 +162,244 @@ async def on_summary(
 async def _prompt_fandom_page(
     message: Message,
     state: FSMContext,
-    reference: IReferenceReader,
+    reference: IReferenceReader,  # noqa: ARG001 — оставлен для обратной совместимости
     *,
-    page: int,
+    page: int,  # noqa: ARG001
 ) -> None:
-    fandoms, total = await reference.list_fandoms_paginated(
-        limit=FANDOM_PAGE_SIZE, offset=page * FANDOM_PAGE_SIZE, active_only=True
-    )
+    """Открыть корень пикера фандомов (двухступенчатый: категория → список)."""
     await state.set_state(CreateFanficStates.waiting_fandom)
+    kb = build_categories_kb(flow="create", show_propose=True)
     await message.answer(
         t("fic_create_fandom_prompt"),
-        reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=page, total=total),
+        reply_markup=kb,
+        parse_mode="HTML",
     )
 
 
-# ---------- fandom ----------
+# ---------- fandom: navigation (cats / cat / search / propose) ----------
 
 
-@router.callback_query(CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page"))
+@router.callback_query(
+    CreateFanficStates.waiting_fandom,
+    FandomPickCD.filter(F.action == "cats"),
+)
+async def on_fandom_back_to_cats(cb: CallbackQuery) -> None:
+    if cb.message is None:
+        await cb.answer()
+        return
+    kb = build_categories_kb(flow="create", show_propose=True)
+    try:
+        await cb.message.edit_text(  # type: ignore[union-attr]
+            t("fic_create_fandom_prompt"),
+            reply_markup=kb,
+            parse_mode="HTML",
+        )
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(t("fic_create_fandom_prompt"), reply_markup=kb, parse_mode="HTML")
+    await cb.answer()
+
+
+@router.callback_query(
+    CreateFanficStates.waiting_fandom,
+    FandomPickCD.filter(F.action == "cat"),
+)
 @inject
-async def on_fandom_page(
+async def on_fandom_pick_category(
     cb: CallbackQuery,
     callback_data: FandomPickCD,
-    state: FSMContext,
     reference: FromDishka[IReferenceReader],
 ) -> None:
     if cb.message is None:
         await cb.answer()
         return
-    fandoms, total = await reference.list_fandoms_paginated(
-        limit=FANDOM_PAGE_SIZE,
-        offset=callback_data.page * FANDOM_PAGE_SIZE,
+    cat = (callback_data.cat or "other").lower()
+    page = max(0, callback_data.page)
+    fandoms, total = await reference.list_fandoms_by_category(
+        category=cat,
+        limit=PICKER_PAGE_SIZE,
+        offset=page * PICKER_PAGE_SIZE,
         active_only=True,
     )
-    await cb.message.edit_reply_markup(
-        reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=callback_data.page, total=total)
+    has_more = (page + 1) * PICKER_PAGE_SIZE < total
+    kb = build_fandoms_in_category_kb(
+        flow="create",
+        cat=cat,
+        fandoms=fandoms,
+        page=page,
+        has_more=has_more,
     )
+    body = f"<b>{category_long_label(cat)}</b>\n\nВыбери фандом или нажми «🔍 Найти по названию»."
+    if not fandoms:
+        body = (
+            f"<b>{category_long_label(cat)}</b>\n\n"
+            "Пока пусто. Попробуй другую категорию или предложи новый фандом."
+        )
+    try:
+        await cb.message.edit_text(body, reply_markup=kb, parse_mode="HTML")  # type: ignore[union-attr]
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(body, reply_markup=kb, parse_mode="HTML")
     await cb.answer()
 
 
-@router.callback_query(CreateFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick"))
+@router.callback_query(
+    CreateFanficStates.waiting_fandom,
+    FandomPickCD.filter(F.action == "search"),
+)
+async def on_fandom_search_start(cb: CallbackQuery, state: FSMContext) -> None:
+    if cb.message is None:
+        await cb.answer()
+        return
+    await state.set_state(CreateFanficStates.waiting_fandom_search)
+    try:
+        await cb.message.edit_text(  # type: ignore[union-attr]
+            t("fic_create_fandom_search_prompt"), parse_mode="HTML"
+        )
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(t("fic_create_fandom_search_prompt"), parse_mode="HTML")
+    await cb.answer()
+
+
+@router.message(CreateFanficStates.waiting_fandom_search, F.text)
+@inject
+async def on_fandom_search_text(
+    message: Message,
+    state: FSMContext,
+    reference: FromDishka[IReferenceReader],
+) -> None:
+    raw = (message.text or "").strip()
+    # Команды (/start, /help, /catalog) — пропускаем и сбрасываем state, чтобы
+    # пользователь мог выйти из мастера в любой момент. cmd_start первым перехватит,
+    # этот guard — страховка.
+    if raw.startswith("/"):
+        await state.clear()
+        return
+    if len(raw) < 2:
+        await message.answer(t("fic_create_fandom_search_too_short"))
+        return
+    try:
+        fandoms = await reference.search_fandoms(query=raw, limit=20, active_only=True)
+    except Exception:  # noqa: BLE001
+        from app.core.logging import get_logger
+
+        get_logger(__name__).exception("fandom_search_failed", q=raw)
+        await message.answer(
+            "Не получилось выполнить поиск. Попробуй ещё раз или вернись к категориям."
+        )
+        return
+    await state.set_state(CreateFanficStates.waiting_fandom)
+    if not fandoms:
+        kb = build_categories_kb(flow="create", show_propose=True)
+        await message.answer(
+            t("fic_create_fandom_search_no_results", q=raw),
+            reply_markup=kb,
+        )
+        return
+    kb = build_search_results_kb(flow="create", fandoms=fandoms)
+    await message.answer(f"По запросу «{raw}»:", reply_markup=kb)
+
+
+@router.callback_query(
+    CreateFanficStates.waiting_fandom,
+    FandomPickCD.filter(F.action == "propose"),
+)
+async def on_fandom_propose_start(cb: CallbackQuery, state: FSMContext) -> None:
+    if cb.message is None:
+        await cb.answer()
+        return
+    await state.set_state(CreateFanficStates.waiting_fandom_proposal_name)
+    try:
+        await cb.message.edit_text(  # type: ignore[union-attr]
+            t("fic_create_fandom_propose_name_prompt"),
+            reply_markup=build_cancel_kb(),
+            parse_mode="HTML",
+        )
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(
+            t("fic_create_fandom_propose_name_prompt"),
+            reply_markup=build_cancel_kb(),
+            parse_mode="HTML",
+        )
+    await cb.answer()
+
+
+@router.message(CreateFanficStates.waiting_fandom_proposal_name, F.text)
+async def on_fandom_propose_name(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if raw.startswith("/"):
+        await state.clear()
+        return
+    if not raw or len(raw) > 256:
+        await message.answer("Название фандома: 1–256 символов. Попробуй ещё раз.")
+        return
+    await state.update_data(_proposal_name=raw)
+    await state.set_state(CreateFanficStates.waiting_fandom_proposal_category)
+    await message.answer(
+        t("fic_create_fandom_propose_category_prompt"),
+        reply_markup=build_propose_categories_kb(),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(
+    CreateFanficStates.waiting_fandom_proposal_category,
+    FandomProposeCategoryCD.filter(),
+)
+@inject
+async def on_fandom_propose_category(
+    cb: CallbackQuery,
+    callback_data: FandomProposeCategoryCD,
+    state: FSMContext,
+    submit_uc: FromDishka[SubmitFandomProposalUseCase],
+) -> None:
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+    data = await state.get_data()
+    name = str(data.get("_proposal_name") or "").strip()
+    if not name:
+        await cb.answer("Сначала пришли название.", show_alert=True)
+        return
+    try:
+        result = await submit_uc(
+            SubmitFandomProposalCommand(
+                requested_by=cb.from_user.id,
+                name=name,
+                category_hint=callback_data.cat,
+            )
+        )
+    except DomainError as e:
+        await cb.answer(str(e), show_alert=True)
+        return
+
+    msg = (
+        t("fic_create_fandom_propose_done")
+        if result.created
+        else t("fic_create_fandom_propose_duplicate")
+    )
+
+    # Возвращаем юзера в выбор фандома (категории) — пусть выберет существующий
+    # и продолжит создание работы.
+    await state.set_state(CreateFanficStates.waiting_fandom)
+    kb = build_categories_kb(flow="create", show_propose=True)
+    try:
+        await cb.message.edit_text(  # type: ignore[union-attr]
+            msg + "\n\n" + t("fic_create_fandom_prompt"),
+            reply_markup=kb,
+            parse_mode="HTML",
+        )
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(
+            msg + "\n\n" + t("fic_create_fandom_prompt"),
+            reply_markup=kb,
+            parse_mode="HTML",
+        )
+    await cb.answer()
+
+
+@router.callback_query(
+    CreateFanficStates.waiting_fandom,
+    FandomPickCD.filter(F.action == "pick"),
+)
 @inject
 async def on_fandom_pick(
     cb: CallbackQuery,
@@ -270,9 +481,7 @@ async def on_cover(
         validate_cover,
     )
 
-    res = await validate_cover(
-        bot, photo.file_id, max_size_bytes=settings.cover_max_size_bytes
-    )
+    res = await validate_cover(bot, photo.file_id, max_size_bytes=settings.cover_max_size_bytes)
     if not res.ok:
         if res.error is CoverError.TOO_LARGE:
             max_mb = settings.cover_max_size_bytes // (1024 * 1024)
@@ -284,9 +493,7 @@ async def on_cover(
                 "Поддерживаются только обложки в формате JPEG или PNG. Загрузи другую."
             )
         else:
-            await message.answer(
-                "Не получилось обработать обложку. Попробуй ещё раз."
-            )
+            await message.answer("Не получилось обработать обложку. Попробуй ещё раз.")
         return
 
     await state.update_data(

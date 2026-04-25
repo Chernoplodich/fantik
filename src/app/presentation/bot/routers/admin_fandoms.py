@@ -55,14 +55,9 @@ async def show_fandoms(
     await cb.answer()
 
 
-_ALLOWED_CATEGORIES_RU = {
-    "books": "📖 Книги",
-    "movies": "🎬 Фильмы",
-    "games": "🎮 Игры",
-    "anime": "🎌 Аниме",
-    "series": "📺 Сериалы",
-    "other": "📦 Другое",
-}
+from app.presentation.bot.fandom_categories import CATEGORIES as _CATEGORIES_TUPLE
+
+_ALLOWED_CATEGORIES_RU: dict[str, str] = {cat.code: cat.short_label for cat in _CATEGORIES_TUPLE}
 
 
 @router.callback_query(FandomAdminCD.filter(F.action == "new"), IsAdmin())
@@ -82,19 +77,14 @@ async def new_fandom_start(cb: CallbackQuery, state: FSMContext) -> None:
 async def receive_name(message: Message, state: FSMContext) -> None:
     name = (message.text or "").strip()
     if not name or len(name) > 256:
-        await message.answer(
-            "❌ Название должно быть от 1 до 256 символов. Пришли ещё раз:"
-        )
+        await message.answer("❌ Название должно быть от 1 до 256 символов. Пришли ещё раз:")
         return
     await state.update_data(name=name)
     await state.set_state(FandomCreateFlow.waiting_category)
+    code_list = ", ".join(f"<code>{c}</code>" for c in _ALLOWED_CATEGORIES_RU)
     options = " / ".join(_ALLOWED_CATEGORIES_RU.values())
     await message.answer(
-        "✏️ <b>Шаг 2/3</b> — категория.\n\n"
-        "Пришли одно из: <code>books</code>, <code>movies</code>, "
-        "<code>games</code>, <code>anime</code>, <code>series</code>, "
-        "<code>other</code>.\n\n"
-        f"Варианты: {options}",
+        f"✏️ <b>Шаг 2/3</b> — категория.\n\nПришли одно из: {code_list}.\n\nВарианты: {options}",
         parse_mode="HTML",
     )
 
@@ -104,8 +94,9 @@ async def receive_category(message: Message, state: FSMContext) -> None:
     cat = (message.text or "").strip().lower()
     if cat not in _ALLOWED_CATEGORIES_RU:
         await message.answer(
-            "❌ Категория должна быть одной из: books / movies / games / "
-            "anime / series / other. Пришли ещё раз:"
+            "❌ Категория должна быть одной из: "
+            + ", ".join(_ALLOWED_CATEGORIES_RU)
+            + ". Пришли ещё раз:"
         )
         return
     await state.update_data(category=cat)
@@ -130,9 +121,7 @@ async def receive_aliases(
     data = await state.get_data()
     raw = (message.text or "").strip()
     aliases: list[str] = (
-        []
-        if raw in {"-", ""}
-        else [x.strip() for x in raw.split(",") if x.strip()]
+        [] if raw in {"-", ""} else [x.strip() for x in raw.split(",") if x.strip()]
     )
 
     try:
@@ -161,10 +150,14 @@ async def receive_aliases(
 
 
 def _format_fandom_card(row: object) -> str:  # type: ignore[no-untyped-def]
+    cat_label = _ALLOWED_CATEGORIES_RU.get(
+        str(row.category),  # type: ignore[attr-defined]
+        str(row.category),  # type: ignore[attr-defined]
+    )
     return (
         f"📚 <b>#{int(row.id)} «{escape(str(row.name))}»</b>\n"  # type: ignore[attr-defined]
         f"slug: <code>{escape(str(row.slug))}</code>\n"  # type: ignore[attr-defined]
-        f"Категория: {escape(str(row.category))}\n"  # type: ignore[attr-defined]
+        f"Категория: {escape(cat_label)} (<code>{escape(str(row.category))}</code>)\n"  # type: ignore[attr-defined]
         f"Альтернативные названия: "
         f"{', '.join(escape(a) for a in row.aliases) if row.aliases else '—'}\n"  # type: ignore[attr-defined]
         f"Статус: {'активен' if row.active else 'выключен'}"  # type: ignore[attr-defined]
@@ -192,9 +185,7 @@ async def open_fandom(
     await cb.answer()
 
 
-@router.callback_query(
-    FandomAdminCD.filter(F.action == "toggle_active"), IsAdmin()
-)
+@router.callback_query(FandomAdminCD.filter(F.action == "toggle_active"), IsAdmin())
 @inject
 async def toggle_fandom_active(
     cb: CallbackQuery,

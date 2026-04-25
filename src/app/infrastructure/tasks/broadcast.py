@@ -56,9 +56,7 @@ async def run_broadcast(broadcast_id: int) -> int:
     # 1) Статус + enumerate — отдельный scope.
     async with container() as scope:
         broadcasts: IBroadcastRepository = await scope.get(IBroadcastRepository)
-        enumerate_uc: EnumerateRecipientsUseCase = await scope.get(
-            EnumerateRecipientsUseCase
-        )
+        enumerate_uc: EnumerateRecipientsUseCase = await scope.get(EnumerateRecipientsUseCase)
         bc = await broadcasts.get(bid)
         if bc is None:
             log.warning("run_broadcast_not_found", broadcast_id=int(bid))
@@ -75,9 +73,7 @@ async def run_broadcast(broadcast_id: int) -> int:
             )
             return 0
         recipient_iter = await enumerate_uc(
-            EnumerateRecipientsCommand(
-                broadcast_id=int(bid), chunk_size=_DELIVERY_BATCH
-            )
+            EnumerateRecipientsCommand(broadcast_id=int(bid), chunk_size=_DELIVERY_BATCH)
         )
         # Собираем чанки в памяти — stream держит session; закроем scope
         # и дальше будем работать чанками в отдельных транзакциях.
@@ -103,9 +99,7 @@ async def run_broadcast(broadcast_id: int) -> int:
                 return total_enqueued
 
             async with uow:
-                inserted = await deliveries.upsert_pending(
-                    broadcast_id=bid, user_ids=chunk
-                )
+                inserted = await deliveries.upsert_pending(broadcast_id=bid, user_ids=chunk)
                 await uow.commit()
 
             log.info(
@@ -121,10 +115,7 @@ async def run_broadcast(broadcast_id: int) -> int:
             for i in range(0, len(chunk), _ENQUEUE_BATCH):
                 sub = chunk[i : i + _ENQUEUE_BATCH]
                 await asyncio.gather(
-                    *[
-                        queue.enqueue_deliver(broadcast_id=bid, user_id=uid)
-                        for uid in sub
-                    ]
+                    *[queue.enqueue_deliver(broadcast_id=bid, user_id=uid) for uid in sub]
                 )
                 total_enqueued += len(sub)
 

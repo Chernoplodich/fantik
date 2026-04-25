@@ -48,27 +48,19 @@ class Broadcast(Base):
     )
     source_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    keyboard: Mapped[list[list[dict[str, Any]]] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    keyboard: Mapped[list[list[dict[str, Any]]] | None] = mapped_column(JSONB, nullable=True)
     segment_spec: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    scheduled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[BroadcastStatus] = mapped_column(
         _bc_status_enum, nullable=False, default=BroadcastStatus.DRAFT, server_default="draft"
     )
     stats: Mapped[dict[str, int]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    finished_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -77,9 +69,7 @@ class Broadcast(Base):
 class BroadcastDelivery(Base):
     __tablename__ = "broadcast_deliveries"
     __table_args__ = (
-        PrimaryKeyConstraint(
-            "broadcast_id", "user_id", name="pk_broadcast_deliveries"
-        ),
+        PrimaryKeyConstraint("broadcast_id", "user_id", name="pk_broadcast_deliveries"),
     )
 
     broadcast_id: Mapped[int] = mapped_column(
@@ -102,6 +92,4 @@ class BroadcastDelivery(Base):
         SmallInteger, nullable=False, default=0, server_default="0"
     )
     error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

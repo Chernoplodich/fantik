@@ -23,14 +23,18 @@ class TestBroadcastMigration:
         try:
             async with engine.connect() as conn:
                 bc_values = (
-                    await conn.execute(
-                        text(
-                            "SELECT enumlabel FROM pg_enum e "
-                            "JOIN pg_type t ON t.oid = e.enumtypid "
-                            "WHERE t.typname = 'bc_status' ORDER BY e.enumsortorder"
+                    (
+                        await conn.execute(
+                            text(
+                                "SELECT enumlabel FROM pg_enum e "
+                                "JOIN pg_type t ON t.oid = e.enumtypid "
+                                "WHERE t.typname = 'bc_status' ORDER BY e.enumsortorder"
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 assert set(bc_values) == {
                     "draft",
                     "scheduled",
@@ -41,14 +45,18 @@ class TestBroadcastMigration:
                 }
 
                 bcd_values = (
-                    await conn.execute(
-                        text(
-                            "SELECT enumlabel FROM pg_enum e "
-                            "JOIN pg_type t ON t.oid = e.enumtypid "
-                            "WHERE t.typname = 'bcd_status' ORDER BY e.enumsortorder"
+                    (
+                        await conn.execute(
+                            text(
+                                "SELECT enumlabel FROM pg_enum e "
+                                "JOIN pg_type t ON t.oid = e.enumtypid "
+                                "WHERE t.typname = 'bcd_status' ORDER BY e.enumsortorder"
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 assert set(bcd_values) == {"pending", "sent", "failed", "blocked"}
         finally:
             await engine.dispose()
@@ -81,13 +89,17 @@ class TestBroadcastMigration:
         try:
             async with engine.connect() as conn:
                 views = (
-                    await conn.execute(
-                        text(
-                            "SELECT matviewname FROM pg_matviews "
-                            "WHERE matviewname LIKE 'mv_%' ORDER BY matviewname"
+                    (
+                        await conn.execute(
+                            text(
+                                "SELECT matviewname FROM pg_matviews "
+                                "WHERE matviewname LIKE 'mv_%' ORDER BY matviewname"
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 assert set(views) >= {
                     "mv_daily_activity",
                     "mv_top_fandoms_7d",
@@ -115,9 +127,7 @@ class TestBroadcastMigration:
         engine = create_async_engine(s.postgres_url)
         try:
             async with engine.begin() as setup_conn:
-                await setup_conn.execute(
-                    text("DELETE FROM broadcast_deliveries WHERE TRUE")
-                )
+                await setup_conn.execute(text("DELETE FROM broadcast_deliveries WHERE TRUE"))
                 await setup_conn.execute(text("DELETE FROM broadcasts WHERE TRUE"))
                 await setup_conn.execute(
                     text(

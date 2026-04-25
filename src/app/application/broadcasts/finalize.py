@@ -56,9 +56,7 @@ class FinalizeBroadcastUseCase:
         self._bot = bot
         self._clock = clock
 
-    async def __call__(
-        self, cmd: FinalizeBroadcastCommand
-    ) -> FinalizeBroadcastResult:
+    async def __call__(self, cmd: FinalizeBroadcastCommand) -> FinalizeBroadcastResult:
         broadcast_id = BroadcastId(int(cmd.broadcast_id))
         async with self._uow:
             bc = await self._broadcasts.get(broadcast_id)

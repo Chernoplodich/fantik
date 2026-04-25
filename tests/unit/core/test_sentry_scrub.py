@@ -31,7 +31,11 @@ def test_scrub_breadcrumb_messages_for_telegram() -> None:
     ev = {
         "breadcrumbs": {
             "values": [
-                {"category": "telegram.update", "message": "text=секрет", "data": {"caption": "foo"}},
+                {
+                    "category": "telegram.update",
+                    "message": "text=секрет",
+                    "data": {"caption": "foo"},
+                },
                 {"category": "db.query", "message": "SELECT 1", "data": {"sql": "SELECT 1"}},
             ]
         }

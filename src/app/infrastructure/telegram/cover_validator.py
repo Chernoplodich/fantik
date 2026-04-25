@@ -29,9 +29,9 @@ class CoverError(str, Enum):
 @dataclass(frozen=True)
 class CoverValidationResult:
     ok: bool
-    format: str | None = None         # "jpeg" / "png" при ok=True
-    error: CoverError | None = None   # при ok=False
-    size: int | None = None           # сколько байт реально скачали
+    format: str | None = None  # "jpeg" / "png" при ok=True
+    error: CoverError | None = None  # при ok=False
+    size: int | None = None  # сколько байт реально скачали
 
 
 def _detect_format(data: bytes) -> str | None:
@@ -56,9 +56,7 @@ async def validate_cover(
 
     reported = getattr(file, "file_size", None)
     if reported is not None and int(reported) > int(max_size_bytes):
-        return CoverValidationResult(
-            ok=False, error=CoverError.TOO_LARGE, size=int(reported)
-        )
+        return CoverValidationResult(ok=False, error=CoverError.TOO_LARGE, size=int(reported))
 
     buf = BytesIO()
     try:
@@ -69,13 +67,9 @@ async def validate_cover(
     data = buf.getvalue()
     size = len(data)
     if size > int(max_size_bytes):
-        return CoverValidationResult(
-            ok=False, error=CoverError.TOO_LARGE, size=size
-        )
+        return CoverValidationResult(ok=False, error=CoverError.TOO_LARGE, size=size)
 
     fmt = _detect_format(data[:16])
     if fmt is None:
-        return CoverValidationResult(
-            ok=False, error=CoverError.BAD_FORMAT, size=size
-        )
+        return CoverValidationResult(ok=False, error=CoverError.BAD_FORMAT, size=size)
     return CoverValidationResult(ok=True, format=fmt, size=size)

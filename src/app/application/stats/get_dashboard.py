@@ -17,9 +17,7 @@ from app.application.stats.ports import (
     UsersOverview,
 )
 
-DashboardKind = Literal[
-    "overview", "tracking", "authors", "fandoms", "moderators", "cohort"
-]
+DashboardKind = Literal["overview", "tracking", "authors", "fandoms", "moderators", "cohort"]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -57,19 +55,13 @@ class GetDashboardUseCase:
                 daily=await self._reader.daily_activity(days=30),
             )
         if cmd.kind == "authors":
-            return DashboardData(
-                kind=cmd.kind, authors=await self._reader.top_authors(limit=10)
-            )
+            return DashboardData(kind=cmd.kind, authors=await self._reader.top_authors(limit=10))
         if cmd.kind == "fandoms":
-            return DashboardData(
-                kind=cmd.kind, fandoms=await self._reader.top_fandoms_7d(limit=10)
-            )
+            return DashboardData(kind=cmd.kind, fandoms=await self._reader.top_fandoms_7d(limit=10))
         if cmd.kind == "moderators":
             return DashboardData(
                 kind=cmd.kind, moderators=await self._reader.moderator_load(days=7)
             )
         if cmd.kind == "cohort":
-            return DashboardData(
-                kind=cmd.kind, cohort=await self._reader.retention_cohort(days=30)
-            )
+            return DashboardData(kind=cmd.kind, cohort=await self._reader.retention_cohort(days=30))
         raise ValueError(f"Неизвестный dashboard: {cmd.kind!r}")

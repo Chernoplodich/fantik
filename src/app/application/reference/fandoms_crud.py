@@ -14,7 +14,27 @@ from app.domain.shared.slugify import slugify
 from app.domain.shared.types import FandomId, UserId
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$")
-_ALLOWED_CATEGORIES = frozenset({"books", "movies", "games", "anime", "series", "other"})
+
+# 11 категорий, синхронно с разделами Книги фанфиков (ficbook).
+# Старая `movies` оставлена в whitelist для обратной совместимости с тестами /
+# историческими данными (миграция 0010 переводит существующие записи в `films`).
+ALLOWED_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "anime",
+        "books",
+        "films",
+        "series",
+        "cartoons",
+        "comics",
+        "games",
+        "musicals",
+        "rpf",
+        "originals",
+        "other",
+        "movies",  # legacy
+    }
+)
+_ALLOWED_CATEGORIES = ALLOWED_CATEGORIES
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -38,9 +58,7 @@ class UpdateFandomCommand:
 def _validate_slug(slug: str) -> str:
     slug = slug.strip().lower()
     if not _SLUG_RE.match(slug):
-        raise ValidationError(
-            "Slug: 3–128 символов [a-z0-9-], не начинается/не заканчивается '-'."
-        )
+        raise ValidationError("Slug: 3–128 символов [a-z0-9-], не начинается/не заканчивается '-'.")
     return slug
 
 
@@ -54,9 +72,7 @@ def _validate_name(name: str) -> str:
 def _validate_category(category: str) -> str:
     category = category.strip().lower()
     if category not in _ALLOWED_CATEGORIES:
-        raise ValidationError(
-            f"Категория: {sorted(_ALLOWED_CATEGORIES)}, получено {category!r}."
-        )
+        raise ValidationError(f"Категория: {sorted(_ALLOWED_CATEGORIES)}, получено {category!r}.")
     return category
 
 

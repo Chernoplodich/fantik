@@ -88,7 +88,6 @@ async def do_merge(
         return
     await render(
         cb,
-        f"✅ Объединено ({result.rows_reassigned} связок).\n\n"
-        f"Осталось пар: {len(items)}.",
+        f"✅ Объединено ({result.rows_reassigned} связок).\n\nОсталось пар: {len(items)}.",
         reply_markup=build_tag_candidates_kb(items),
     )

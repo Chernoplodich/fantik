@@ -44,7 +44,9 @@ async def _handle(request: web.Request) -> web.Response:
         )
     if method == "getFile":
         # Отдаём имитацию пути; реальный download сыграет чуть ниже.
-        return _ok({"file_id": "fake", "file_unique_id": "fake", "file_size": 512, "file_path": "fake.png"})
+        return _ok(
+            {"file_id": "fake", "file_unique_id": "fake", "file_size": 512, "file_path": "fake.png"}
+        )
     if method in {
         "sendMessage",
         "editMessageText",

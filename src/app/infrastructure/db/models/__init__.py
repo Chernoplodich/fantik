@@ -8,6 +8,7 @@ from app.infrastructure.db.models.broadcast import Broadcast, BroadcastDelivery
 from app.infrastructure.db.models.chapter import Chapter
 from app.infrastructure.db.models.chapter_page import ChapterPage
 from app.infrastructure.db.models.fandom import Fandom
+from app.infrastructure.db.models.fandom_proposal import FandomProposal
 from app.infrastructure.db.models.fanfic import Fanfic
 from app.infrastructure.db.models.fanfic_tag import FanficTag
 from app.infrastructure.db.models.fanfic_version import FanficVersion
@@ -37,6 +38,7 @@ __all__ = [
     "Chapter",
     "ChapterPage",
     "Fandom",
+    "FandomProposal",
     "Fanfic",
     "FanficTag",
     "FanficVersion",

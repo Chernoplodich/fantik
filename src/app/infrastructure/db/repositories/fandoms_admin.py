@@ -50,9 +50,7 @@ class PgFandomAdminRepository(IFandomAdminRepository):
         ).scalar_one_or_none()
         if existing:
             raise ConflictError(f"Фандом со slug «{slug}» уже существует.")
-        m = FandomModel(
-            slug=slug, name=name, category=category, aliases=list(aliases), active=True
-        )
+        m = FandomModel(slug=slug, name=name, category=category, aliases=list(aliases), active=True)
         self._s.add(m)
         await self._s.flush()
         return _to_row(m)

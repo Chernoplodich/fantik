@@ -58,9 +58,7 @@ class TestDeliverFlow:
         engine = create_async_engine(s.postgres_url)
         try:
             async with engine.begin() as setup_conn:
-                await setup_conn.execute(
-                    text("DELETE FROM broadcast_deliveries WHERE TRUE")
-                )
+                await setup_conn.execute(text("DELETE FROM broadcast_deliveries WHERE TRUE"))
                 await setup_conn.execute(text("DELETE FROM broadcasts WHERE TRUE"))
                 await setup_conn.execute(
                     text(
@@ -116,12 +114,15 @@ class TestDeliverFlow:
                     bucket = FakeBucket()
                     clock = FrozenClock(at=now)
                     uc = DeliverOneUseCase(
-                        uow, bc_repo, d_repo, bot, bucket,  # type: ignore[arg-type]
-                        s, clock,
+                        uow,
+                        bc_repo,
+                        d_repo,
+                        bot,
+                        bucket,  # type: ignore[arg-type]
+                        s,
+                        clock,
                     )
-                    res = await uc(
-                        DeliverOneCommand(broadcast_id=int(bid), user_id=int(uid))
-                    )
+                    res = await uc(DeliverOneCommand(broadcast_id=int(bid), user_id=int(uid)))
                     assert res.sent is True
                     await session.close()
 
@@ -143,9 +144,7 @@ class TestDeliverFlow:
         engine = create_async_engine(s.postgres_url)
         try:
             async with engine.begin() as setup_conn:
-                await setup_conn.execute(
-                    text("DELETE FROM broadcast_deliveries WHERE TRUE")
-                )
+                await setup_conn.execute(text("DELETE FROM broadcast_deliveries WHERE TRUE"))
                 await setup_conn.execute(text("DELETE FROM broadcasts WHERE TRUE"))
                 await setup_conn.execute(
                     text(
@@ -176,9 +175,7 @@ class TestDeliverFlow:
                 assert bc is not None
                 bc.launch(now=now)
                 await bc_repo.save(bc)
-                await d_repo.upsert_pending(
-                    broadcast_id=bid, user_ids=[UserId(7502)]
-                )
+                await d_repo.upsert_pending(broadcast_id=bid, user_ids=[UserId(7502)])
 
                 bc2 = await bc_repo.get(bid)
                 assert bc2 is not None
@@ -197,12 +194,15 @@ class TestDeliverFlow:
                 bucket = FakeBucket()
                 clock = FrozenClock(at=datetime.now(tz=UTC))
                 uc = DeliverOneUseCase(
-                    uow, bc_repo, d_repo, bot, bucket,  # type: ignore[arg-type]
-                    s, clock,
+                    uow,
+                    bc_repo,
+                    d_repo,
+                    bot,
+                    bucket,  # type: ignore[arg-type]
+                    s,
+                    clock,
                 )
-                res = await uc(
-                    DeliverOneCommand(broadcast_id=int(bid), user_id=7502)
-                )
+                res = await uc(DeliverOneCommand(broadcast_id=int(bid), user_id=7502))
                 assert res.sent is False
                 assert bot.calls == 0  # не вызываем TG при cancelled
                 counts = await d_repo.count_by_status(bid)

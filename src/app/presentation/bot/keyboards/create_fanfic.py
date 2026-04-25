@@ -1,47 +1,21 @@
-"""Inline-клавиатуры для мастера создания фика."""
+"""Inline-клавиатуры для мастера создания фика.
+
+Пикер фандомов вынесен в `keyboards/fandom_picker.py` (двухступенчатый
+с категориями + поиском + предложением нового). Здесь остались только
+вспомогательные клавиатуры мастера: возрастной рейтинг, обложка,
+chapter-or-submit и универсальный «Отмена».
+"""
 
 from __future__ import annotations
 
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.application.fanfics.ports import AgeRatingRef, FandomRef
+from app.application.fanfics.ports import AgeRatingRef
 from app.presentation.bot.callback_data.fanfic import (
     AgeRatingCD,
-    FandomPickCD,
     FanficCD,
 )
-
-FANDOM_PAGE_SIZE = 10
-
-
-def build_fandom_picker_kb(
-    *, fandoms: list[FandomRef], page: int, total: int
-) -> InlineKeyboardMarkup:
-    b = InlineKeyboardBuilder()
-    for f in fandoms:
-        b.button(
-            text=f.name,
-            callback_data=FandomPickCD(action="pick", fandom_id=int(f.id)),
-        )
-    b.adjust(1)
-
-    nav = InlineKeyboardBuilder()
-    max_page = max(0, (total - 1) // FANDOM_PAGE_SIZE)
-    if page > 0:
-        nav.button(
-            text="◀",
-            callback_data=FandomPickCD(action="page", page=page - 1),
-        )
-    if page < max_page:
-        nav.button(
-            text="▶",
-            callback_data=FandomPickCD(action="page", page=page + 1),
-        )
-    if nav.buttons:
-        b.attach(nav)
-        nav.adjust(2)
-    return b.as_markup()
 
 
 def build_age_rating_kb(ratings: list[AgeRatingRef]) -> InlineKeyboardMarkup:

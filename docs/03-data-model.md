@@ -81,14 +81,39 @@
 | `id` | BIGSERIAL PK | |
 | `slug` | TEXT NOT NULL UQ | `harry-potter`, `marvel` |
 | `name` | TEXT NOT NULL | «Гарри Поттер» |
-| `category` | TEXT NOT NULL | books / movies / games / series / anime / …  |
+| `category` | TEXT NOT NULL | `anime` / `books` / `films` / `series` / `cartoons` / `comics` / `games` / `musicals` / `rpf` / `originals` / `other` (11 категорий по образцу ficbook) |
 | `aliases` | TEXT[] NOT NULL DEFAULT '{}' | `['HP', 'Hogwarts', 'Поттериана']` |
 | `active` | BOOLEAN NOT NULL DEFAULT TRUE | |
 | `created_at` | timestamptz NOT NULL DEFAULT now() | |
 
 Индексы:
 - `GIN (aliases)` — для поиска синонимов.
+- `GIN (name gin_trgm_ops)` — `pg_trgm` для быстрого ILIKE/тригграмм при поиске фандома по подстроке (миграция `0010`).
 - `IX (category)`.
+
+> **legacy:** до миграции `0010_fandoms_taxonomy_expand` категория `movies` использовалась для фильмов и (по ошибке) для сериалов. Миграция перевела `movies → films` и точечно поправила `stranger-things/sherlock-bbc/supernatural/doctor-who → series`. В Python-коде whitelist `_ALLOWED_CATEGORIES` сохраняет `movies` для обратной совместимости. UI (`fandom_categories.get_category`) маппит `movies → films` при отображении.
+
+### `fandom_proposals` (Этап 8)
+
+Заявки пользователей на новый фандом. Поток: автор → `pending` → админ → `approved | rejected`. Approve **создаёт** новую запись в `fandoms` (через `CreateFandomUseCase`) и фиксирует `created_fandom_id` для аудита.
+
+| Колонка | Тип | Комментарий |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `name` | VARCHAR(256) NOT NULL | Что предлагает автор |
+| `category_hint` | VARCHAR(32) NOT NULL | Один из кодов категорий (тот же whitelist, что у `fandoms`) |
+| `comment` | VARCHAR(500) | Опциональное пояснение от автора |
+| `requested_by` | BIGINT NOT NULL FK users(id) ON DELETE CASCADE | |
+| `status` | ENUM `fandom_proposal_status` ('pending'/'approved'/'rejected') NOT NULL DEFAULT 'pending' | |
+| `reviewed_by` | BIGINT FK users(id) ON DELETE SET NULL | Заполняется при approve/reject |
+| `reviewed_at` | timestamptz | |
+| `decision_comment` | VARCHAR(500) | Комментарий модератора (особенно при reject) |
+| `created_fandom_id` | BIGINT FK fandoms(id) ON DELETE SET NULL | Заполняется при approve |
+| `created_at` | timestamptz NOT NULL DEFAULT now() | |
+
+Индексы:
+- `IX (status, created_at DESC)` — список pending-заявок для админа.
+- **Partial UNIQUE** `uq_fandom_proposals_open_per_user_name` на `(requested_by, LOWER(name)) WHERE status='pending'` — анти-дубль: один пользователь не может иметь две открытые заявки с одинаковым именем. После approve/reject ту же заявку можно подать повторно.
 
 ### `age_ratings`
 | Колонка | Тип | Комментарий |

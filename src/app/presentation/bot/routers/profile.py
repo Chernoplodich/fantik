@@ -185,9 +185,7 @@ async def delete_me_entry(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.callback_query(
-    DeleteMeFlow.confirming, F.data == "profile:delete_me:cancel"
-)
+@router.callback_query(DeleteMeFlow.confirming, F.data == "profile:delete_me:cancel")
 async def delete_me_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     if cb.message is not None:
@@ -198,9 +196,7 @@ async def delete_me_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer("Отменено")
 
 
-@router.callback_query(
-    DeleteMeFlow.confirming, F.data == "profile:delete_me:confirm"
-)
+@router.callback_query(DeleteMeFlow.confirming, F.data == "profile:delete_me:confirm")
 @inject
 async def delete_me_confirm(
     cb: CallbackQuery,

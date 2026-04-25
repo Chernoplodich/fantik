@@ -34,9 +34,7 @@ def build_segment_where(plan: SegmentPlan) -> ColumnElement[bool]:
 
     if plan.kind == SEGMENT_KIND_ACTIVE_SINCE_DAYS:
         assert plan.days is not None
-        return User.last_seen_at > text(
-            f"now() - make_interval(days => {int(plan.days)})"
-        )
+        return User.last_seen_at > text(f"now() - make_interval(days => {int(plan.days)})")
 
     if plan.kind == SEGMENT_KIND_AUTHORS:
         # Есть хотя бы один approved fanfic у этого юзера.
@@ -62,9 +60,7 @@ def build_segment_where(plan: SegmentPlan) -> ColumnElement[bool]:
     if plan.kind == SEGMENT_KIND_UTM:
         assert plan.utm_code is not None
         code_scalar = (
-            select(TrackingCode.id)
-            .where(TrackingCode.code == str(plan.utm_code))
-            .scalar_subquery()
+            select(TrackingCode.id).where(TrackingCode.code == str(plan.utm_code)).scalar_subquery()
         )
         return User.utm_source_code_id == code_scalar
 

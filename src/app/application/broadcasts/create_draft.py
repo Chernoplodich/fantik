@@ -41,9 +41,7 @@ class CreateBroadcastDraftUseCase:
         self._audit = audit
         self._clock = clock
 
-    async def __call__(
-        self, cmd: CreateBroadcastDraftCommand
-    ) -> CreateBroadcastDraftResult:
+    async def __call__(self, cmd: CreateBroadcastDraftCommand) -> CreateBroadcastDraftResult:
         async with self._uow:
             now = self._clock.now()
             draft = Broadcast.new_draft(

@@ -65,9 +65,7 @@ async def finalize_running_broadcasts_tick() -> int:
     async with container() as scope:
         broadcasts: IBroadcastRepository = await scope.get(IBroadcastRepository)
         queue: IBroadcastQueue = await scope.get(IBroadcastQueue)
-        running = await broadcasts.list_by_status(
-            [BroadcastStatus.RUNNING], limit=50
-        )
+        running = await broadcasts.list_by_status([BroadcastStatus.RUNNING], limit=50)
         for bc in running:
             try:
                 await queue.enqueue_finalize(bc.id)

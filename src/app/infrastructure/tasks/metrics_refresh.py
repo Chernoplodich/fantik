@@ -61,9 +61,7 @@ async def _refresh_db_gauges(session: AsyncSession) -> None:
     )
     ACTIVE_USERS_24H.set(int(active or 0))
 
-    approved = await session.scalar(
-        text("SELECT count(*) FROM fanfics WHERE status = 'approved'")
-    )
+    approved = await session.scalar(text("SELECT count(*) FROM fanfics WHERE status = 'approved'"))
     FICS_APPROVED_TOTAL_G.set(int(approved or 0))
 
     # Outbox — возраст самого старого неопубликованного события.

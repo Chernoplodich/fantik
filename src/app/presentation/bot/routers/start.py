@@ -54,6 +54,11 @@ async def cmd_start(
     if message.from_user is None:  # защитный кейс
         return
 
+    # /start — это всегда «сбросить контекст и начать заново». Очищаем FSM до
+    # любых дальнейших шагов, чтобы юзер не залипал в state'ах из прошлой сессии
+    # (например, в `entering_fandom_search` после нажатия «🔍 Найти»).
+    await state.clear()
+
     utm_code, special = _parse_payload(command.args or "")
 
     result = await register_uc(

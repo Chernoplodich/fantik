@@ -25,6 +25,9 @@ class SearchDocSource:
     fandom_id: int
     fandom_name: str
     fandom_aliases: list[str] = field(default_factory=list)
+    fandom_category: str = ""
+    """Код категории фандома (anime/books/films/...). Индексируется как
+    filterable attribute (см. settings_bootstrap)."""
     age_rating: str
     age_rating_order: int
     tags: list[str] = field(default_factory=list)

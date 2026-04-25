@@ -53,9 +53,7 @@ def parse_keyboard_text(raw: str) -> list[list[dict[str, Any]]] | None:
                 current = []
             continue
         if "|" not in line:
-            raise KeyboardValidationError(
-                f"Строка «{line}» не содержит разделитель «|»."
-            )
+            raise KeyboardValidationError(f"Строка «{line}» не содержит разделитель «|».")
         text, url = (x.strip() for x in line.split("|", 1))
         if not text:
             raise KeyboardValidationError("Пустой текст кнопки.")
@@ -69,9 +67,7 @@ def parse_keyboard_text(raw: str) -> list[list[dict[str, Any]]] | None:
         current.append({"text": text, "url": url})
         total_buttons += 1
         if total_buttons > _MAX_BUTTONS:
-            raise KeyboardValidationError(
-                f"Слишком много кнопок, максимум {_MAX_BUTTONS}."
-            )
+            raise KeyboardValidationError(f"Слишком много кнопок, максимум {_MAX_BUTTONS}.")
 
     if current:
         rows.append(current)
@@ -88,8 +84,7 @@ def _validate_url(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
         raise KeyboardValidationError(
-            f"Недопустимая схема URL «{parsed.scheme}» — разрешены "
-            "https://, tg://, t.me/."
+            f"Недопустимая схема URL «{parsed.scheme}» — разрешены https://, tg://, t.me/."
         )
     if not parsed.netloc and parsed.scheme != "tg":
         raise KeyboardValidationError(f"URL без хоста: «{url}».")

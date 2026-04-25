@@ -80,9 +80,7 @@ class Broadcast(EventEmitter):
         self._require_status({BroadcastStatus.DRAFT, BroadcastStatus.SCHEDULED})
         self.status = BroadcastStatus.SCHEDULED
         self.scheduled_at = scheduled_at
-        self._emit(
-            BroadcastScheduled(broadcast_id=self.id, scheduled_at=scheduled_at)
-        )
+        self._emit(BroadcastScheduled(broadcast_id=self.id, scheduled_at=scheduled_at))
 
     def launch(self, *, now: datetime) -> None:
         self._require_status({BroadcastStatus.DRAFT, BroadcastStatus.SCHEDULED})
@@ -104,9 +102,7 @@ class Broadcast(EventEmitter):
             )
         self.status = BroadcastStatus.CANCELLED
         self.finished_at = now
-        self._emit(
-            BroadcastCancelled(broadcast_id=self.id, actor_id=actor_id)
-        )
+        self._emit(BroadcastCancelled(broadcast_id=self.id, actor_id=actor_id))
 
     def mark_finished(self, *, stats: dict[str, int], now: datetime) -> None:
         self._require_status({BroadcastStatus.RUNNING})

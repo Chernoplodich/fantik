@@ -283,6 +283,30 @@ class FakeReference(IReferenceReader):
     async def get_fandom(self, fandom_id: FandomId) -> FandomRef | None:
         return self.fandom if fandom_id == self.fandom.id else None
 
+    async def list_fandoms_by_category(
+        self,
+        *,
+        category: str,
+        limit: int,
+        offset: int,
+        active_only: bool = True,
+    ) -> tuple[list[FandomRef], int]:
+        if self.fandom.category == category:
+            return [self.fandom], 1
+        return [], 0
+
+    async def search_fandoms(
+        self,
+        *,
+        query: str,
+        limit: int = 20,
+        category: str | None = None,
+        active_only: bool = True,
+    ) -> list[FandomRef]:
+        if query.lower() in self.fandom.name.lower():
+            return [self.fandom]
+        return []
+
     async def list_age_ratings(self) -> list[AgeRatingRef]:
         return [self.rating]
 

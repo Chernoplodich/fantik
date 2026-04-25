@@ -22,9 +22,7 @@ class PgTagAdminRepository(ITagAdminRepository):
         stmt = select(TagModel.id).where(TagModel.id == int(tag_id))
         return (await self._s.execute(stmt)).scalar_one_or_none() is not None
 
-    async def merge(
-        self, *, canonical_id: TagId, source_ids: list[TagId]
-    ) -> int:
+    async def merge(self, *, canonical_id: TagId, source_ids: list[TagId]) -> int:
         if not source_ids:
             return 0
         source_int = [int(s) for s in source_ids]
@@ -51,9 +49,7 @@ class PgTagAdminRepository(ITagAdminRepository):
         ).scalar_one()
 
         # Удалить исходные (fic_id, source_tag_id) пары.
-        del_stmt = text(
-            "DELETE FROM fanfic_tags WHERE tag_id = ANY(:sources)"
-        )
+        del_stmt = text("DELETE FROM fanfic_tags WHERE tag_id = ANY(:sources)")
         await self._s.execute(del_stmt, {"sources": source_int})
 
         # 2) Сложить usage_count в canonical, обнулить у sources.

@@ -69,9 +69,7 @@ def interpret_segment(spec: dict[str, Any] | None) -> SegmentPlan:
     if kind == SEGMENT_KIND_SUBSCRIBERS_OF:
         author_id = spec.get("author_id")
         if not isinstance(author_id, int) or author_id <= 0:
-            raise SegmentValidationError(
-                "subscribers_of.author_id должен быть положительным int."
-            )
+            raise SegmentValidationError("subscribers_of.author_id должен быть положительным int.")
         return SegmentPlan(kind=kind, author_id=int(author_id))
 
     if kind == SEGMENT_KIND_UTM:

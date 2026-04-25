@@ -77,6 +77,7 @@ class PgSearchDocSource(ISearchDocSource):
             fandom_id=int(fic.fandom_id),
             fandom_name=str(fandom.name) if fandom else "",
             fandom_aliases=list(fandom.aliases) if fandom else [],
+            fandom_category=str(fandom.category) if fandom else "",
             age_rating=str(rating.code) if rating else "",
             age_rating_order=int(rating.sort_order) if rating else 0,
             tags=tags,

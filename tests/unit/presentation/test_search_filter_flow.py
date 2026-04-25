@@ -54,6 +54,28 @@ class _FakeReference:
                 return f
         return None
 
+    async def list_fandoms_by_category(
+        self,
+        *,
+        category: str,
+        limit: int,
+        offset: int,
+        active_only: bool = True,
+    ) -> tuple[list[FandomRef], int]:
+        in_cat = [f for f in self._fandoms if f.category == category]
+        return in_cat[offset : offset + limit], len(in_cat)
+
+    async def search_fandoms(
+        self,
+        *,
+        query: str,
+        limit: int = 20,
+        category: str | None = None,
+        active_only: bool = True,
+    ) -> list[FandomRef]:
+        q = query.lower()
+        return [f for f in self._fandoms if q in f.name.lower()][:limit]
+
     async def list_age_ratings(self) -> list[AgeRatingRef]:
         return list(self._ages)
 

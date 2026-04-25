@@ -92,8 +92,16 @@ from app.application.reference.fandoms_crud import (
 )
 from app.application.reference.ports import (
     IFandomAdminRepository,
+    IFandomProposalNotifier,
+    IFandomProposalRepository,
     ITagAdminRepository,
     ITagCandidatesReader,
+)
+from app.application.reference.proposals import (
+    ApproveFandomProposalUseCase,
+    ListPendingFandomProposalsUseCase,
+    RejectFandomProposalUseCase,
+    SubmitFandomProposalUseCase,
 )
 from app.application.reference.tags_merge import (
     ListMergeCandidatesUseCase,
@@ -152,6 +160,9 @@ from app.infrastructure.db.repositories.chapter_pages import (
     ChapterPagesRepository,
 )
 from app.infrastructure.db.repositories.chapters import ChapterRepository
+from app.infrastructure.db.repositories.fandom_proposals import (
+    PgFandomProposalRepository,
+)
 from app.infrastructure.db.repositories.fandoms_admin import (
     PgFandomAdminRepository,
 )
@@ -208,6 +219,7 @@ from app.infrastructure.telegram.bot_factory import build_bot
 from app.infrastructure.telegram.copy_message import AiogramBroadcastBot
 from app.infrastructure.telegram.mod_notifier import ModeratorNotifier
 from app.infrastructure.telegram.notifier import AuthorNotifier
+from app.infrastructure.telegram.proposal_notifier import FandomProposalNotifier
 
 
 class SettingsProvider(Provider):
@@ -307,10 +319,12 @@ class BotProvider(Provider):
         return BroadcastFloodLock(redis)
 
     @provide
-    def broadcast_bot(
-        self, bot: Bot, flood_lock: BroadcastFloodLock
-    ) -> IBroadcastBot:
+    def broadcast_bot(self, bot: Bot, flood_lock: BroadcastFloodLock) -> IBroadcastBot:
         return AiogramBroadcastBot(bot, flood_lock)
+
+    @provide
+    def fandom_proposal_notifier(self, bot: Bot) -> IFandomProposalNotifier:
+        return FandomProposalNotifier(bot)
 
 
 class QueuesProvider(Provider):
@@ -485,6 +499,10 @@ class RepositoriesProvider(Provider):
     @provide
     def fandom_admin_repo(self, session: AsyncSession) -> IFandomAdminRepository:
         return PgFandomAdminRepository(session)
+
+    @provide
+    def fandom_proposal_repo(self, session: AsyncSession) -> IFandomProposalRepository:
+        return PgFandomProposalRepository(session)
 
     @provide
     def tag_admin_repo(self, session: AsyncSession) -> ITagAdminRepository:
@@ -998,9 +1016,7 @@ class UseCasesProvider(Provider):
         settings: Settings,
         clock: Clock,
     ) -> DeliverOneUseCase:
-        return DeliverOneUseCase(
-            uow, broadcasts, deliveries, users, bot, bucket, settings, clock
-        )
+        return DeliverOneUseCase(uow, broadcasts, deliveries, users, bot, bucket, settings, clock)
 
     @provide
     def finalize_broadcast_uc(
@@ -1013,14 +1029,10 @@ class UseCasesProvider(Provider):
         bot: IBroadcastBot,
         clock: Clock,
     ) -> FinalizeBroadcastUseCase:
-        return FinalizeBroadcastUseCase(
-            uow, broadcasts, deliveries, outbox, audit, bot, clock
-        )
+        return FinalizeBroadcastUseCase(uow, broadcasts, deliveries, outbox, audit, bot, clock)
 
     @provide
-    def list_my_broadcasts_uc(
-        self, broadcasts: IBroadcastRepository
-    ) -> ListMyBroadcastsUseCase:
+    def list_my_broadcasts_uc(self, broadcasts: IBroadcastRepository) -> ListMyBroadcastsUseCase:
         return ListMyBroadcastsUseCase(broadcasts)
 
     @provide
@@ -1044,9 +1056,7 @@ class UseCasesProvider(Provider):
         return CreateTrackingCodeUseCase(uow, tracking, audit, clock)
 
     @provide
-    def list_tracking_codes_uc(
-        self, tracking: ITrackingRepository
-    ) -> ListTrackingCodesUseCase:
+    def list_tracking_codes_uc(self, tracking: ITrackingRepository) -> ListTrackingCodesUseCase:
         return ListTrackingCodesUseCase(tracking)
 
     @provide
@@ -1072,9 +1082,7 @@ class UseCasesProvider(Provider):
     # ---------- reference admin ----------
 
     @provide
-    def list_fandoms_admin_uc(
-        self, repo: IFandomAdminRepository
-    ) -> ListFandomsAdminUseCase:
+    def list_fandoms_admin_uc(self, repo: IFandomAdminRepository) -> ListFandomsAdminUseCase:
         return ListFandomsAdminUseCase(repo)
 
     @provide
@@ -1108,10 +1116,50 @@ class UseCasesProvider(Provider):
         return MergeTagsUseCase(uow, repo, audit, clock)
 
     @provide
-    def list_merge_candidates_uc(
-        self, reader: ITagCandidatesReader
-    ) -> ListMergeCandidatesUseCase:
+    def list_merge_candidates_uc(self, reader: ITagCandidatesReader) -> ListMergeCandidatesUseCase:
         return ListMergeCandidatesUseCase(reader)
+
+    # ---------- fandom proposals ----------
+
+    @provide
+    def submit_fandom_proposal_uc(
+        self,
+        uow: UnitOfWork,
+        repo: IFandomProposalRepository,
+        notifier: IFandomProposalNotifier,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> SubmitFandomProposalUseCase:
+        return SubmitFandomProposalUseCase(uow, repo, notifier, audit, clock)
+
+    @provide
+    def approve_fandom_proposal_uc(
+        self,
+        uow: UnitOfWork,
+        repo: IFandomProposalRepository,
+        create_fandom_uc: CreateFandomUseCase,
+        notifier: IFandomProposalNotifier,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> ApproveFandomProposalUseCase:
+        return ApproveFandomProposalUseCase(uow, repo, create_fandom_uc, notifier, audit, clock)
+
+    @provide
+    def reject_fandom_proposal_uc(
+        self,
+        uow: UnitOfWork,
+        repo: IFandomProposalRepository,
+        notifier: IFandomProposalNotifier,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> RejectFandomProposalUseCase:
+        return RejectFandomProposalUseCase(uow, repo, notifier, audit, clock)
+
+    @provide
+    def list_pending_proposals_uc(
+        self, repo: IFandomProposalRepository
+    ) -> ListPendingFandomProposalsUseCase:
+        return ListPendingFandomProposalsUseCase(repo)
 
 
 def build_container() -> AsyncContainer:

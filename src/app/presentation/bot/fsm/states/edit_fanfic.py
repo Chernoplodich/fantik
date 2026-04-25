@@ -9,7 +9,8 @@ class EditFanficStates(StatesGroup):
     selecting_field = State()
     waiting_title = State()
     waiting_summary = State()
-    waiting_fandom = State()
+    waiting_fandom = State()  # экран категорий / категория / поиск
+    waiting_fandom_search = State()  # ввод подстроки фандома
     waiting_age_rating = State()
     waiting_tags = State()
     waiting_cover = State()

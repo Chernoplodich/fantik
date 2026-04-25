@@ -71,8 +71,7 @@ class UserRepository(IUserRepository):
     async def mark_bot_blocked(self, user_id: UserId) -> None:
         await self._s.execute(
             text(
-                "UPDATE users SET blocked_bot_at = :now "
-                "WHERE id = :uid AND blocked_bot_at IS NULL"
+                "UPDATE users SET blocked_bot_at = :now WHERE id = :uid AND blocked_bot_at IS NULL"
             ),
             {"now": datetime.now(UTC), "uid": int(user_id)},
         )

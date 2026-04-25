@@ -27,9 +27,7 @@ class PgStatsReader(IStatsReader):
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    async def funnel_by_code(
-        self, *, code: str, days: int = 30
-    ) -> FunnelRow | None:
+    async def funnel_by_code(self, *, code: str, days: int = 30) -> FunnelRow | None:
         # Основной запрос — события по коду (переходы/регистрации/...).
         stmt = text(
             """
@@ -69,9 +67,7 @@ class PgStatsReader(IStatsReader):
                AND blocked_bot_at IS NOT NULL
             """
         )
-        blocked = (
-            await self._s.execute(blocked_stmt, {"code_id": int(row.code_id)})
-        ).scalar_one()
+        blocked = (await self._s.execute(blocked_stmt, {"code_id": int(row.code_id)})).scalar_one()
 
         return FunnelRow(
             code=row.code,
@@ -121,9 +117,7 @@ class PgStatsReader(IStatsReader):
             """
         )
         row = (await self._s.execute(stmt)).one()
-        return DauWauMau(
-            dau=int(row.dau or 0), wau=int(row.wau or 0), mau=int(row.mau or 0)
-        )
+        return DauWauMau(dau=int(row.dau or 0), wau=int(row.wau or 0), mau=int(row.mau or 0))
 
     async def users_overview(self) -> UsersOverview:
         """Сводка: total + таблица [сегодня / вчера / 7 дней] по МСК.
@@ -215,9 +209,7 @@ class PgStatsReader(IStatsReader):
             ),
         )
 
-    async def users_daily_series(
-        self, *, days: int = 30
-    ) -> list[UsersDailyPoint]:
+    async def users_daily_series(self, *, days: int = 30) -> list[UsersDailyPoint]:
         """Таймсерия по дням МСК: новые / активные / заблокировавшие.
 
         Генерим все дни в диапазоне (даже пустые), чтобы график не зиял дырами.

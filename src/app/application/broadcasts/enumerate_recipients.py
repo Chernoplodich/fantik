@@ -40,9 +40,7 @@ class EnumerateRecipientsUseCase:
         self._deliveries = deliveries
         self._segments = segments
 
-    async def __call__(
-        self, cmd: EnumerateRecipientsCommand
-    ) -> AsyncIterator[list[UserId]]:
+    async def __call__(self, cmd: EnumerateRecipientsCommand) -> AsyncIterator[list[UserId]]:
         bc = await self._broadcasts.get(BroadcastId(int(cmd.broadcast_id)))
         if bc is None:
             raise NotFoundError("Рассылка не найдена.")

@@ -180,8 +180,13 @@ def feed_kb(
     page: int,
     has_more: bool,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура ленты каталога."""
-    from app.presentation.bot.callback_data.browse import BrowseCD
+    """Клавиатура ленты каталога.
+
+    Если задан `fandom_id` — добавляем кнопку «🔎 Поиск в этом фандоме»,
+    она запускает quick-search с предустановленным фильтром по этому фандому
+    (юзер ищет «арка» внутри Наруто, не выходя в общий поиск).
+    """
+    from app.presentation.bot.callback_data.browse import BrowseCD, QuickQCD
 
     b = InlineKeyboardBuilder()
     for item in items:
@@ -205,5 +210,14 @@ def feed_kb(
         else _btn(" ", _NOOP)
     )
     b.row(prev_btn, page_btn, next_btn)
+    if fandom_id:
+        # Поиск внутри этого фандома: пробрасываем fandom_id в callback,
+        # чтобы handler сразу выставил `s_fandoms=[fandom_id]` перед FSM.
+        b.row(
+            _btn(
+                "🔎 Поиск в этом фандоме",
+                QuickQCD(a="in_fandom", fd=int(fandom_id)).pack(),
+            )
+        )
     b.row(_btn("⟵ Каталог", BrowseCD(a="root").pack()))
     return b.as_markup()

@@ -39,6 +39,7 @@ def to_meili_doc(src: SearchDocSource) -> dict[str, object]:
         "fandom_id": int(src.fandom_id),
         "fandom_name": src.fandom_name,
         "fandom_aliases": list(src.fandom_aliases),
+        "fandom_category": src.fandom_category or "",
         "age_rating": src.age_rating,
         "age_rating_order": int(src.age_rating_order),
         "tags": list(src.tags),

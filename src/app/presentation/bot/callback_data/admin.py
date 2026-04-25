@@ -8,7 +8,7 @@ from aiogram.filters.callback_data import CallbackData
 class AdminCD(CallbackData, prefix="adm"):
     """Корневой роутинг админ-меню."""
 
-    action: str  # root / broadcasts / tracking / stats / fandoms / tags / back
+    action: str  # root / broadcasts / tracking / stats / fandoms / proposals / tags / back
 
 
 class BroadcastCD(CallbackData, prefix="bc"):
@@ -45,6 +45,13 @@ class StatsCD(CallbackData, prefix="st"):
 class FandomAdminCD(CallbackData, prefix="fd"):
     action: str  # list / new / open / toggle_active
     fandom_id: int = 0
+
+
+class FandomProposalAdminCD(CallbackData, prefix="fdp"):
+    """Админ-операции над заявкой на фандом."""
+
+    action: str  # list / open / approve / reject
+    pid: int = 0
 
 
 class TagAdminCD(CallbackData, prefix="tg"):

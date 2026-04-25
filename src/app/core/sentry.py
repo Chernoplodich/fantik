@@ -49,9 +49,7 @@ def _strip_keys(obj: Any, keys: frozenset[str]) -> None:
             _strip_keys(item, keys)
 
 
-def scrub_pii_event(
-    event: dict[str, Any], _hint: dict[str, Any] | None
-) -> dict[str, Any] | None:
+def scrub_pii_event(event: dict[str, Any], _hint: dict[str, Any] | None) -> dict[str, Any] | None:
     """before_send/before_send_transaction hook.
 
     Ужимаем `user` до `id`, режем PII-ключи в breadcrumbs/extras/contexts/request.
@@ -72,7 +70,10 @@ def scrub_pii_event(
                 if isinstance(bc, dict):
                     _strip_keys(bc.get("data", {}), _PII_KEYS)
                     # message в breadcrumb может содержать сырой текст — срезаем до уровня
-                    if "message" in bc and bc.get("category") in {"telegram.update", "telegram.message"}:
+                    if "message" in bc and bc.get("category") in {
+                        "telegram.update",
+                        "telegram.message",
+                    }:
                         bc["message"] = "<scrubbed>"
 
     return event

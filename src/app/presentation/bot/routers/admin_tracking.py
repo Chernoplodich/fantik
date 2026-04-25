@@ -45,10 +45,7 @@ async def _show_tracking_list(
     *, event: CallbackQuery | Message, list_uc: ListTrackingCodesUseCase
 ) -> None:
     codes = await list_uc(active_only=False)
-    items = [
-        (int(c.id) if c.id else 0, str(c.code), str(c.name), bool(c.active))
-        for c in codes
-    ]
+    items = [(int(c.id) if c.id else 0, str(c.code), str(c.name), bool(c.active)) for c in codes]
     header = "🔗 <b>Трекинговые ссылки</b>"
     if not items:
         text = header + "\n\nЕщё ни одного кода не создано."
@@ -77,8 +74,7 @@ async def new_code_start(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(TrackingCodeFlow.waiting_name)
     await render(
         cb,
-        "✏️ Введи человеко-читаемое имя кампании "
-        "(например: «Канал @examples» или «Реклама ВК»):",
+        "✏️ Введи человеко-читаемое имя кампании (например: «Канал @examples» или «Реклама ВК»):",
     )
     await cb.answer()
 
@@ -96,9 +92,7 @@ async def receive_tracking_name(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.message(
-    TrackingCodeFlow.waiting_description, F.chat.type == "private", IsAdmin()
-)
+@router.message(TrackingCodeFlow.waiting_description, F.chat.type == "private", IsAdmin())
 @inject
 async def receive_tracking_description(
     message: Message,
@@ -129,9 +123,7 @@ async def receive_tracking_description(
     me = await bot.get_me()
     link = f"https://t.me/{me.username}?start={result.code}"
     await message.answer(
-        f"✅ Трекинговая ссылка создана.\n\n"
-        f"Код: {result.code}\n"
-        f"Ссылка для рекламы:\n{link}"
+        f"✅ Трекинговая ссылка создана.\n\nКод: {result.code}\nСсылка для рекламы:\n{link}"
     )
     await state.clear()
 
@@ -188,9 +180,7 @@ async def open_tracking_card(
     await render(
         cb,
         "\n".join(lines),
-        reply_markup=build_tracking_card_kb(
-            int(code.id) if code.id else 0, active=code.active
-        ),
+        reply_markup=build_tracking_card_kb(int(code.id) if code.id else 0, active=code.active),
         parse_mode="HTML",
     )
     await cb.answer()
@@ -245,11 +235,7 @@ async def deactivate_code(
         await cb.answer()
         return
     try:
-        await uc(
-            DeactivateCodeCommand(
-                code_id=callback_data.code_id, actor_id=cb.from_user.id
-            )
-        )
+        await uc(DeactivateCodeCommand(code_id=callback_data.code_id, actor_id=cb.from_user.id))
     except DomainError as e:
         await cb.answer(str(e), show_alert=True)
         return

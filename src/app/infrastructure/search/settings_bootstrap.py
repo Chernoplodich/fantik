@@ -93,6 +93,10 @@ def _build_settings() -> MeilisearchSettings:
             # fandom_name используется как фасет: Meili требует filterable-атрибут
             # для возврата facetDistribution (см. application/search/filter_builder.FACETS).
             "fandom_name",
+            # Категория (anime/books/films/...) — для будущего фильтра «по разделу».
+            # Прямо сейчас UI её не использует, но включаем, чтобы избежать второго
+            # bootstrap'а при добавлении фильтра.
+            "fandom_category",
             "age_rating",
             "age_rating_order",
             "tags",

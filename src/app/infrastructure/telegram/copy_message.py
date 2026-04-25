@@ -124,6 +124,4 @@ class AiogramBroadcastBot(IBroadcastBot):
             # Админ заблокировал бота — маловероятно; silent skip.
             log.warning("broadcast_summary_forbidden", chat_id=int(chat_id))
         except TelegramAPIError as e:
-            log.warning(
-                "broadcast_summary_failed", chat_id=int(chat_id), error=str(e)
-            )
+            log.warning("broadcast_summary_failed", chat_id=int(chat_id), error=str(e))

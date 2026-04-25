@@ -156,9 +156,7 @@ class RejectUseCase:
             MODERATION_DECISIONS.labels(decision="reject").inc()
             submitted_at = getattr(case, "created_at", None) or getattr(case, "locked_at", None)
             if submitted_at is not None:
-                MODERATION_DECISION_LATENCY.observe(
-                    max(0.0, (now - submitted_at).total_seconds())
-                )
+                MODERATION_DECISION_LATENCY.observe(max(0.0, (now - submitted_at).total_seconds()))
 
             notify_author_id = fic.author_id
             notify_fic_id = fic.id

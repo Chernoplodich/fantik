@@ -16,7 +16,19 @@ class ChapterCD(CallbackData, prefix="ch"):
 
 
 class FandomPickCD(CallbackData, prefix="fandom"):
-    action: str  # pick / page
+    """Двухступенчатый пикер: категория → фандомы внутри категории.
+
+    Поля:
+    - action: cats (показать список категорий), cat (войти в категорию),
+              page (страница внутри категории), pick (выбор), search (войти в поиск),
+              propose (войти в flow предложения).
+    - cat:    короткий код категории (или "" для cats/search/propose).
+    - page:   номер страницы (0-based) — только для cat/page.
+    - fandom_id: id для action=pick.
+    """
+
+    action: str
+    cat: str = ""
     page: int = 0
     fandom_id: int = 0
 
@@ -44,3 +56,9 @@ class ChapterActionCD(CallbackData, prefix="chact"):
 
     action: str
     chapter_id: int
+
+
+class FandomProposeCategoryCD(CallbackData, prefix="fpcat"):
+    """Выбор категории при предложении нового фандома (FSM)."""
+
+    cat: str

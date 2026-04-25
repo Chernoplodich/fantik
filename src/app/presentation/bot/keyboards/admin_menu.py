@@ -14,6 +14,7 @@ def build_admin_menu_kb() -> InlineKeyboardMarkup:
     b.button(text="🔗 Трекинг", callback_data=AdminCD(action="tracking").pack())
     b.button(text="📊 Статистика", callback_data=AdminCD(action="stats").pack())
     b.button(text="📚 Фандомы", callback_data=AdminCD(action="fandoms").pack())
+    b.button(text="📋 Заявки на фандом", callback_data=AdminCD(action="proposals").pack())
     b.button(text="🏷️ Теги (merge)", callback_data=AdminCD(action="tags").pack())
     b.button(text="◀︎ Назад", callback_data="menu:main")
     b.adjust(1)

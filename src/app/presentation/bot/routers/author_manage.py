@@ -74,11 +74,18 @@ from app.presentation.bot.keyboards.author_manage import (
     build_fanfic_card_kb,
     build_my_works_kb,
 )
+from app.presentation.bot.fandom_categories import category_long_label
 from app.presentation.bot.keyboards.create_fanfic import (
-    FANDOM_PAGE_SIZE,
     build_age_rating_kb,
     build_chapter_or_submit_kb,
-    build_fandom_picker_kb,
+)
+from app.presentation.bot.keyboards.fandom_picker import (
+    FANDOMS_PER_PAGE as PICKER_PAGE_SIZE,
+)
+from app.presentation.bot.keyboards.fandom_picker import (
+    build_categories_kb,
+    build_fandoms_in_category_kb,
+    build_search_results_kb,
 )
 from app.presentation.bot.routers._chapter_buffer import (
     append_chunk,
@@ -701,20 +708,38 @@ async def edit_field_fandom(
 ) -> None:
     await state.set_state(EditFanficStates.waiting_fandom)
     await state.update_data(fic_id=callback_data.fic_id)
-    fandoms, total = await reference.list_fandoms_paginated(
-        limit=FANDOM_PAGE_SIZE, offset=0, active_only=True
-    )
     if cb.message is not None:
         await cb.message.answer(
             t("edit_prompt_fandom"),
-            reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=0, total=total),
+            reply_markup=build_categories_kb(flow="create", show_propose=False),
+            parse_mode="HTML",
         )
     await cb.answer()
 
 
-@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "page"))
+@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "cats"))
+async def edit_fandom_back_to_cats(cb: CallbackQuery) -> None:
+    if cb.message is None:
+        await cb.answer()
+        return
+    try:
+        await cb.message.edit_text(  # type: ignore[union-attr]
+            t("edit_prompt_fandom"),
+            reply_markup=build_categories_kb(flow="create", show_propose=False),
+            parse_mode="HTML",
+        )
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(
+            t("edit_prompt_fandom"),
+            reply_markup=build_categories_kb(flow="create", show_propose=False),
+            parse_mode="HTML",
+        )
+    await cb.answer()
+
+
+@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "cat"))
 @inject
-async def edit_fandom_page(
+async def edit_fandom_pick_category(
     cb: CallbackQuery,
     callback_data: FandomPickCD,
     reference: FromDishka[IReferenceReader],
@@ -722,15 +747,75 @@ async def edit_fandom_page(
     if cb.message is None:
         await cb.answer()
         return
-    fandoms, total = await reference.list_fandoms_paginated(
-        limit=FANDOM_PAGE_SIZE,
-        offset=callback_data.page * FANDOM_PAGE_SIZE,
+    cat = (callback_data.cat or "other").lower()
+    page = max(0, callback_data.page)
+    fandoms, total = await reference.list_fandoms_by_category(
+        category=cat,
+        limit=PICKER_PAGE_SIZE,
+        offset=page * PICKER_PAGE_SIZE,
         active_only=True,
     )
-    await cb.message.edit_reply_markup(
-        reply_markup=build_fandom_picker_kb(fandoms=fandoms, page=callback_data.page, total=total)
+    has_more = (page + 1) * PICKER_PAGE_SIZE < total
+    kb = build_fandoms_in_category_kb(
+        flow="create", cat=cat, fandoms=fandoms, page=page, has_more=has_more
     )
+    body = f"<b>{category_long_label(cat)}</b>\n\nВыбери фандом."
+    try:
+        await cb.message.edit_text(body, reply_markup=kb, parse_mode="HTML")  # type: ignore[union-attr]
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(body, reply_markup=kb, parse_mode="HTML")
     await cb.answer()
+
+
+@router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "search"))
+async def edit_fandom_search_start(cb: CallbackQuery, state: FSMContext) -> None:
+    if cb.message is None:
+        await cb.answer()
+        return
+    await state.set_state(EditFanficStates.waiting_fandom_search)
+    body = t("fic_create_fandom_search_prompt")
+    try:
+        await cb.message.edit_text(body, parse_mode="HTML")  # type: ignore[union-attr]
+    except Exception:  # noqa: BLE001
+        await cb.message.answer(body, parse_mode="HTML")
+    await cb.answer()
+
+
+@router.message(EditFanficStates.waiting_fandom_search, F.text)
+@inject
+async def edit_fandom_search_text(
+    message: Message,
+    state: FSMContext,
+    reference: FromDishka[IReferenceReader],
+) -> None:
+    raw = (message.text or "").strip()
+    if raw.startswith("/"):
+        await state.clear()
+        return
+    if len(raw) < 2:
+        await message.answer(t("fic_create_fandom_search_too_short"))
+        return
+    try:
+        fandoms = await reference.search_fandoms(query=raw, limit=20, active_only=True)
+    except Exception:  # noqa: BLE001
+        from app.core.logging import get_logger
+
+        get_logger(__name__).exception("fandom_search_failed", q=raw)
+        await message.answer(
+            "Не получилось выполнить поиск. Попробуй ещё раз или вернись к категориям."
+        )
+        return
+    await state.set_state(EditFanficStates.waiting_fandom)
+    if not fandoms:
+        await message.answer(
+            t("fic_create_fandom_search_no_results", q=raw),
+            reply_markup=build_categories_kb(flow="create", show_propose=False),
+        )
+        return
+    await message.answer(
+        f"По запросу «{raw}»:",
+        reply_markup=build_search_results_kb(flow="create", fandoms=fandoms),
+    )
 
 
 @router.callback_query(EditFanficStates.waiting_fandom, FandomPickCD.filter(F.action == "pick"))
@@ -852,9 +937,7 @@ async def edit_cover_value(
         validate_cover,
     )
 
-    res = await validate_cover(
-        bot, photo.file_id, max_size_bytes=settings.cover_max_size_bytes
-    )
+    res = await validate_cover(bot, photo.file_id, max_size_bytes=settings.cover_max_size_bytes)
     if not res.ok:
         if res.error is CoverError.TOO_LARGE:
             max_mb = settings.cover_max_size_bytes // (1024 * 1024)

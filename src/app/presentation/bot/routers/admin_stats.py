@@ -116,19 +116,13 @@ async def show_dashboard(
 # ---------- renderers ----------
 
 
-async def _render_overview(
-    *, event: CallbackQuery | Message, data: DashboardData
-) -> None:
+async def _render_overview(*, event: CallbackQuery | Message, data: DashboardData) -> None:
     ov = data.users_overview
     series = data.users_series or []
 
-    caption = (
-        _format_overview_caption(ov) if ov is not None else "📊 Статистика недоступна."
-    )
+    caption = _format_overview_caption(ov) if ov is not None else "📊 Статистика недоступна."
 
-    png = render_users_daily_png(
-        series, title="Новые и заблокировавшие — 30 дней"
-    )
+    png = render_users_daily_png(series, title="Новые и заблокировавшие — 30 дней")
     await render_photo(
         event,
         photo=BufferedInputFile(png, "users_30d.png"),
@@ -152,18 +146,10 @@ def _format_overview_caption(ov) -> str:  # type: ignore[no-untyped-def]
         max(len(str(r[1].active)) for r in rows),
         max(len(str(r[1].blocked)) for r in rows),
     )
-    header = (
-        f"{'':<{label_w}}"
-        f"{'Новые':>{col_w}}  "
-        f"{'Активн':>{col_w}}  "
-        f"{'Блок':>{col_w}}"
-    )
+    header = f"{'':<{label_w}}{'Новые':>{col_w}}  {'Активн':>{col_w}}  {'Блок':>{col_w}}"
     sep = "─" * len(header)
     body = "\n".join(
-        f"{label:<{label_w}}"
-        f"{b.new:>{col_w}}  "
-        f"{b.active:>{col_w}}  "
-        f"{b.blocked:>{col_w}}"
+        f"{label:<{label_w}}{b.new:>{col_w}}  {b.active:>{col_w}}  {b.blocked:>{col_w}}"
         for label, b in rows
     )
     table = "<pre>" + "\n".join([header, sep, body]) + "</pre>"
@@ -195,8 +181,7 @@ async def _render_tracking(*, cb: CallbackQuery, data: DashboardData) -> None:
         caption = "\n".join(lines)
     else:
         caption = (
-            "📈 <b>Трекинг-события</b>\n\n"
-            "Данных пока нет — никто не приходил по трекинг-ссылкам."
+            "📈 <b>Трекинг-события</b>\n\nДанных пока нет — никто не приходил по трекинг-ссылкам."
         )
     png = render_daily_activity_png(rows, "Трекинг-события — 30 дней")
     await render_photo(

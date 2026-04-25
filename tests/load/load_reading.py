@@ -20,9 +20,7 @@ from tests.load.conftest import make_callback
 
 def _webhook_path() -> str:
     base = os.environ.get("WEBHOOK_PATH", "/webhook")
-    token = os.environ.get(
-        "BOT_TOKEN", "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN"
-    )
+    token = os.environ.get("BOT_TOKEN", "123456:TEST_TOKEN_CI_ONLY_NOT_A_REAL_BOT_TOKEN")
     token_hash = hashlib.sha256(token.encode()).hexdigest()[:32]
     return f"{base.rstrip('/')}/{token_hash}"
 

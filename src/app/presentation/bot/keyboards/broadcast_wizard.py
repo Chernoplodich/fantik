@@ -62,9 +62,7 @@ def build_broadcast_card_kb(
             [
                 InlineKeyboardButton(
                     text="🔄 Обновить",
-                    callback_data=BroadcastCD(
-                        action="refresh", bid=broadcast_id
-                    ).pack(),
+                    callback_data=BroadcastCD(action="refresh", bid=broadcast_id).pack(),
                 )
             ]
         )
@@ -73,9 +71,7 @@ def build_broadcast_card_kb(
             [
                 InlineKeyboardButton(
                     text="🛑 Отменить",
-                    callback_data=BroadcastCD(
-                        action="cancel", bid=broadcast_id
-                    ).pack(),
+                    callback_data=BroadcastCD(action="cancel", bid=broadcast_id).pack(),
                 )
             ]
         )
@@ -84,9 +80,7 @@ def build_broadcast_card_kb(
             [
                 InlineKeyboardButton(
                     text="🔁 Повторить для упавших",
-                    callback_data=BroadcastCD(
-                        action="retry_failed", bid=broadcast_id
-                    ).pack(),
+                    callback_data=BroadcastCD(action="retry_failed", bid=broadcast_id).pack(),
                 )
             ]
         )
@@ -105,9 +99,7 @@ def build_broadcast_list_kb(items: list[tuple[int, str]]) -> InlineKeyboardMarku
     """items: list[(broadcast_id, short_label)]."""
     b = InlineKeyboardBuilder()
     for bid, label in items:
-        b.button(
-            text=label, callback_data=BroadcastCD(action="open", bid=bid).pack()
-        )
+        b.button(text=label, callback_data=BroadcastCD(action="open", bid=bid).pack())
     b.button(text="➕ Новая рассылка", callback_data=BroadcastCD(action="new").pack())
     b.button(text="◀︎ Админ-меню", callback_data=AdminCD(action="root").pack())
     b.adjust(1)

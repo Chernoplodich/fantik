@@ -53,9 +53,7 @@ async def render(
                 parse_mode=parse_mode,
             )
         try:
-            return await msg.edit_text(
-                text=text, reply_markup=reply_markup, parse_mode=parse_mode
-            )
+            return await msg.edit_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
         except TelegramBadRequest as e:
             if "not modified" in str(e):
                 return None

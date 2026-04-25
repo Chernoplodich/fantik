@@ -1,14 +1,16 @@
-"""Клавиатуры каталога."""
+"""Клавиатуры каталога.
+
+Корневая `browse_root_kb` — главный экран каталога. Пикер «🎭 По фэндому»
+теперь живёт в общем `keyboards/fandom_picker.py` (`flow="browse"`),
+поэтому отдельной плоской клавиатуры здесь больше нет.
+"""
 
 from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.application.fanfics.ports import FandomRef
-from app.presentation.bot.callback_data.browse import BrowseCD
-
-_NOOP = "noop"
+from app.presentation.bot.callback_data.browse import BrowseCD, QuickQCD
 
 
 def _btn(text: str, callback_data: str) -> InlineKeyboardButton:
@@ -16,36 +18,27 @@ def _btn(text: str, callback_data: str) -> InlineKeyboardButton:
 
 
 def browse_root_kb() -> InlineKeyboardMarkup:
+    """Корень каталога: один экран с прогрессивным раскрытием.
+
+    Сверху — самый частый сценарий (текстовый поиск). Под ним — готовые
+    подборки и выбор фандома. «🔧 Расширенный поиск» открывает фильтры
+    тем, кому нужны точные комбинации — большинству юзеров не нужно.
+    """
     # Локальный импорт: избегаем циклов при инициализации модулей keyboards/*.
     from app.presentation.bot.callback_data.search import SearchCD
 
     b = InlineKeyboardBuilder()
+    # Главный CTA — текстовый поиск (одна большая кнопка).
+    b.row(_btn("✏️ Найти по слову", QuickQCD(a="start").pack()))
+    # Готовые подборки — самое популярное.
     b.row(
         _btn("🆕 Новое", BrowseCD(a="new").pack()),
         _btn("🔥 Топ", BrowseCD(a="top").pack()),
     )
-    b.row(_btn("🏷 По фэндому", BrowseCD(a="by_fandom").pack()))
-    b.row(_btn("🔎 Фильтры", SearchCD(a="filters_root").pack()))
+    b.row(_btn("🎭 По фэндому", BrowseCD(a="by_fandom").pack()))
+    # Только для тех кому нужны точные фильтры — спрятано отдельной кнопкой.
+    b.row(_btn("🔧 Расширенный поиск", SearchCD(a="filters_root").pack()))
     b.row(_btn("← Главное меню", "menu:back"))
     return b.as_markup()
 
 
-def fandom_pick_kb(*, fandoms: list[FandomRef], page: int, has_more: bool) -> InlineKeyboardMarkup:
-    b = InlineKeyboardBuilder()
-    for f in fandoms:
-        b.row(
-            _btn(
-                f.name,
-                BrowseCD(a="fandom", fd=int(f.id), pg=0).pack(),
-            )
-        )
-    prev_btn = (
-        _btn("◀", BrowseCD(a="fd_page", pg=page - 1).pack()) if page > 0 else _btn(" ", _NOOP)
-    )
-    page_btn = _btn(f"стр. {page + 1}", _NOOP)
-    next_btn = (
-        _btn("▶", BrowseCD(a="fd_page", pg=page + 1).pack()) if has_more else _btn(" ", _NOOP)
-    )
-    b.row(prev_btn, page_btn, next_btn)
-    b.row(_btn("⟵ Каталог", BrowseCD(a="root").pack()))
-    return b.as_markup()

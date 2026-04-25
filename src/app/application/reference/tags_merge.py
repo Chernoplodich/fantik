@@ -64,9 +64,7 @@ class MergeTagsUseCase:
                 if not await self._repo.exists(s):
                     raise NotFoundError(f"Source-тег #{s} не найден.")
 
-            rows = await self._repo.merge(
-                canonical_id=canonical, source_ids=sources
-            )
+            rows = await self._repo.merge(canonical_id=canonical, source_ids=sources)
             await self._audit.log(
                 actor_id=UserId(int(cmd.actor_id)),
                 action="tag.merge",

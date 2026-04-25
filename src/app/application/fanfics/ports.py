@@ -164,6 +164,29 @@ class IReferenceReader(Protocol):
 
     async def get_fandom(self, fandom_id: FandomId) -> FandomRef | None: ...
 
+    async def list_fandoms_by_category(
+        self,
+        *,
+        category: str,
+        limit: int,
+        offset: int,
+        active_only: bool = True,
+    ) -> tuple[list[FandomRef], int]: ...
+
+    async def search_fandoms(
+        self,
+        *,
+        query: str,
+        limit: int = 20,
+        category: str | None = None,
+        active_only: bool = True,
+    ) -> list[FandomRef]:
+        """Поиск фандома по подстроке: ILIKE в name + поиск среди aliases.
+
+        Sortировка: prefix-match name → name asc.
+        """
+        ...
+
     async def list_age_ratings(self) -> list[AgeRatingRef]: ...
 
     async def get_age_rating(self, rating_id: int) -> AgeRatingRef | None: ...

@@ -106,9 +106,7 @@ async def _show_broadcasts_list(
             )
         )
     text = "📣 <b>Рассылки</b>\n\nВыбери рассылку или создай новую."
-    await _ui_render(
-        event, text, reply_markup=build_broadcast_list_kb(labels), parse_mode="HTML"
-    )
+    await _ui_render(event, text, reply_markup=build_broadcast_list_kb(labels), parse_mode="HTML")
 
 
 # ---------- entry ----------
@@ -124,9 +122,7 @@ async def cmd_broadcast(
     if message.from_user is None:
         return
     await state.clear()
-    await _show_broadcasts_list(
-        event=message, list_uc=list_uc, user_id=message.from_user.id
-    )
+    await _show_broadcasts_list(event=message, list_uc=list_uc, user_id=message.from_user.id)
 
 
 @router.callback_query(AdminCD.filter(F.action == "broadcasts"), IsAdmin())
@@ -140,9 +136,7 @@ async def open_broadcasts_menu(
         await cb.answer()
         return
     await state.clear()
-    await _show_broadcasts_list(
-        event=cb, list_uc=list_uc, user_id=cb.from_user.id
-    )
+    await _show_broadcasts_list(event=cb, list_uc=list_uc, user_id=cb.from_user.id)
     await cb.answer()
 
 
@@ -157,9 +151,7 @@ async def show_list(
         await cb.answer()
         return
     await state.clear()
-    await _show_broadcasts_list(
-        event=cb, list_uc=list_uc, user_id=cb.from_user.id
-    )
+    await _show_broadcasts_list(event=cb, list_uc=list_uc, user_id=cb.from_user.id)
     await cb.answer()
 
 
@@ -192,9 +184,7 @@ async def on_source_message(
         return
     # Не принимаем сервисные/неподдерживаемые типы.
     if message.media_group_id is not None:
-        await message.answer(
-            "❌ Медиа-группы пока не поддерживаются. Отправь одиночное сообщение."
-        )
+        await message.answer("❌ Медиа-группы пока не поддерживаются. Отправь одиночное сообщение.")
         return
 
     try:
@@ -242,9 +232,7 @@ async def on_source_message(
     if captured_kb is not None:
         try:
             await set_kb_uc(
-                SetKeyboardCommand(
-                    broadcast_id=result.broadcast_id, keyboard=captured_kb
-                )
+                SetKeyboardCommand(broadcast_id=result.broadcast_id, keyboard=captured_kb)
             )
         except DomainError as e:
             log.warning("broadcast_captured_kb_save_failed", error=str(e))
@@ -292,9 +280,7 @@ def _extract_inline_keyboard(
             elif "switch_inline_query" in data:
                 safe["switch_inline_query"] = data["switch_inline_query"]
             elif "switch_inline_query_current_chat" in data:
-                safe["switch_inline_query_current_chat"] = data[
-                    "switch_inline_query_current_chat"
-                ]
+                safe["switch_inline_query_current_chat"] = data["switch_inline_query_current_chat"]
             else:
                 # Кнопка без поддерживаемого действия — пропускаем.
                 continue
@@ -302,8 +288,6 @@ def _extract_inline_keyboard(
         if row_out:
             rows.append(row_out)
     return rows or None
-
-
 
 
 # ---------- wizard: клавиатура ----------
@@ -341,9 +325,7 @@ async def ask_keyboard_input(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer()
 
 
-@router.message(
-    BroadcastFlow.waiting_keyboard_input, F.chat.type == "private", IsAdmin()
-)
+@router.message(BroadcastFlow.waiting_keyboard_input, F.chat.type == "private", IsAdmin())
 @inject
 async def receive_keyboard_input(
     message: Message,
@@ -472,9 +454,7 @@ async def schedule_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer()
 
 
-@router.message(
-    BroadcastFlow.waiting_schedule_datetime, F.chat.type == "private", IsAdmin()
-)
+@router.message(BroadcastFlow.waiting_schedule_datetime, F.chat.type == "private", IsAdmin())
 async def schedule_datetime(
     message: Message,
     state: FSMContext,
@@ -484,8 +464,7 @@ async def schedule_datetime(
         dt = datetime.strptime(raw, "%d.%m.%Y %H:%M")
     except ValueError:
         await message.answer(
-            "❌ Неверный формат. Нужно: <b>ДД.ММ.ГГГГ ЧЧ:ММ</b>\n"
-            "Например: 10.10.2026 10:10",
+            "❌ Неверный формат. Нужно: <b>ДД.ММ.ГГГГ ЧЧ:ММ</b>\nНапример: 10.10.2026 10:10",
             parse_mode="HTML",
         )
         return
@@ -525,9 +504,7 @@ async def schedule_datetime(
 # ---------- confirm ----------
 
 
-@router.callback_query(
-    ConfirmCD.filter(F.action == "ok"), BroadcastFlow.confirm, IsAdmin()
-)
+@router.callback_query(ConfirmCD.filter(F.action == "ok"), BroadcastFlow.confirm, IsAdmin())
 @inject
 async def confirm_ok(
     cb: CallbackQuery,
@@ -543,15 +520,10 @@ async def confirm_ok(
     mode = data.get("schedule_mode")
     try:
         if mode == "now":
-            await launch_uc(
-                LaunchBroadcastCommand(
-                    broadcast_id=bid, actor_id=cb.from_user.id
-                )
-            )
+            await launch_uc(LaunchBroadcastCommand(broadcast_id=bid, actor_id=cb.from_user.id))
             await _ui_render(
                 cb,
-                f"🚀 Рассылка #{bid} запущена.\n"
-                "Прогресс можно отслеживать в карточке рассылки.",
+                f"🚀 Рассылка #{bid} запущена.\nПрогресс можно отслеживать в карточке рассылки.",
                 reply_markup=build_after_launch_kb(bid),
             )
         elif mode == "schedule":
@@ -566,8 +538,7 @@ async def confirm_ok(
             msk = scheduled_at.astimezone(ZoneInfo("Europe/Moscow"))
             await _ui_render(
                 cb,
-                f"📅 Рассылка #{bid} запланирована на "
-                f"{msk.strftime('%d.%m.%Y %H:%M')} МСК.",
+                f"📅 Рассылка #{bid} запланирована на {msk.strftime('%d.%m.%Y %H:%M')} МСК.",
                 reply_markup=build_after_launch_kb(bid),
             )
         else:
@@ -578,9 +549,7 @@ async def confirm_ok(
     await cb.answer()
 
 
-@router.callback_query(
-    ConfirmCD.filter(F.action == "cancel"), BroadcastFlow.confirm, IsAdmin()
-)
+@router.callback_query(ConfirmCD.filter(F.action == "cancel"), BroadcastFlow.confirm, IsAdmin())
 async def confirm_cancel(cb: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await _ui_render(cb, "Запуск отменён. Черновик сохранён.")
@@ -612,9 +581,9 @@ async def open_broadcast_card(
     counts = view.counts
 
     can_cancel = bc.status not in FINAL_STATUSES
-    can_retry_failed = bc.status == BroadcastStatus.FINISHED and int(
-        counts.get(DeliveryStatus.FAILED, 0)
-    ) > 0
+    can_retry_failed = (
+        bc.status == BroadcastStatus.FINISHED and int(counts.get(DeliveryStatus.FAILED, 0)) > 0
+    )
     show_refresh = bc.status in (BroadcastStatus.RUNNING, BroadcastStatus.SCHEDULED)
 
     kb = build_broadcast_card_kb(
@@ -712,11 +681,7 @@ async def cancel_broadcast(
         await cb.answer()
         return
     try:
-        await uc(
-            CancelBroadcastCommand(
-                broadcast_id=callback_data.bid, actor_id=cb.from_user.id
-            )
-        )
+        await uc(CancelBroadcastCommand(broadcast_id=callback_data.bid, actor_id=cb.from_user.id))
     except DomainError as e:
         await cb.answer(str(e), show_alert=True)
         return
@@ -756,9 +721,7 @@ async def retry_failed(
             )
         )
         await launch_uc(
-            LaunchBroadcastCommand(
-                broadcast_id=new.broadcast_id, actor_id=cb.from_user.id
-            )
+            LaunchBroadcastCommand(broadcast_id=new.broadcast_id, actor_id=cb.from_user.id)
         )
     except DomainError as e:
         await cb.answer(str(e), show_alert=True)
