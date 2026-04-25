@@ -31,6 +31,10 @@ def build_tracking_card_kb(code_id: int, *, active: bool) -> InlineKeyboardMarku
         text="📊 Воронка (график)",
         callback_data=TrackingCD(action="funnel", code_id=code_id).pack(),
     )
+    b.button(
+        text="📥 Выгрузить ID (.txt)",
+        callback_data=TrackingCD(action="export_users", code_id=code_id).pack(),
+    )
     if active:
         b.button(
             text="🔒 Деактивировать",

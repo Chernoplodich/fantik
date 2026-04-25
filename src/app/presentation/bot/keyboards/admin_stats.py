@@ -17,6 +17,10 @@ def build_stats_overview_kb() -> InlineKeyboardMarkup:
     b.button(text="📚 Топ фандомов", callback_data=StatsCD(dashboard="fandoms").pack())
     b.button(text="🛡️ Модераторы", callback_data=StatsCD(dashboard="moderators").pack())
     b.button(text="🔁 Retention", callback_data=StatsCD(dashboard="cohort").pack())
+    b.button(
+        text="📥 Выгрузить всех ID (.txt)",
+        callback_data=StatsCD(dashboard="export_users").pack(),
+    )
     b.button(text="⚙️ Админ-меню", callback_data=AdminCD(action="root").pack())
     b.adjust(1)
     return b.as_markup()

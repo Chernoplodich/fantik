@@ -34,12 +34,12 @@ class ConfirmCD(CallbackData, prefix="bccf"):
 
 
 class TrackingCD(CallbackData, prefix="trk"):
-    action: str  # list / new / open / deactivate / funnel
+    action: str  # list / new / open / deactivate / funnel / export_users
     code_id: int = 0
 
 
 class StatsCD(CallbackData, prefix="st"):
-    dashboard: str  # today / week / authors / fandoms / moderators / cohort
+    dashboard: str  # today / week / authors / fandoms / moderators / cohort / export_users
 
 
 class FandomAdminCD(CallbackData, prefix="fd"):

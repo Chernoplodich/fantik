@@ -146,8 +146,12 @@ from app.application.tracking.list_codes import ListTrackingCodesUseCase
 from app.application.tracking.ports import ITrackingRepository
 from app.application.tracking.record_event import RecordEventUseCase
 from app.application.users.agree_to_rules import AgreeToRulesUseCase
-from app.application.users.ports import IUserRepository
 from app.application.users.delete_user import DeleteUserUseCase
+from app.application.users.export_user_ids import (
+    ExportAllUserIdsUseCase,
+    ExportUtmUserIdsUseCase,
+)
+from app.application.users.ports import IUserRepository
 from app.application.users.register_user import RegisterUserUseCase
 from app.application.users.set_author_nick import SetAuthorNickUseCase
 from app.core.clock import Clock, SystemClock
@@ -570,6 +574,25 @@ class UseCasesProvider(Provider):
         clock: Clock,
     ) -> DeleteUserUseCase:
         return DeleteUserUseCase(uow, users, session, audit, clock)
+
+    @provide
+    def export_all_user_ids_uc(
+        self,
+        users: IUserRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> ExportAllUserIdsUseCase:
+        return ExportAllUserIdsUseCase(users, audit, clock)
+
+    @provide
+    def export_utm_user_ids_uc(
+        self,
+        users: IUserRepository,
+        tracking: ITrackingRepository,
+        audit: IAuditLog,
+        clock: Clock,
+    ) -> ExportUtmUserIdsUseCase:
+        return ExportUtmUserIdsUseCase(users, tracking, audit, clock)
 
     @provide
     def record_event(

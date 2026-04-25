@@ -8,7 +8,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.users.ports import IUserRepository
-from app.domain.shared.types import UserId
+from app.domain.shared.types import TrackingCodeId, UserId
 from app.domain.users.entities import User as UserEntity
 from app.infrastructure.db.mappers.user import (
     apply_to_model,
@@ -84,3 +84,17 @@ class UserRepository(IUserRepository):
             ),
             {"uid": int(user_id)},
         )
+
+    async def list_all_user_ids(self) -> list[UserId]:
+        stmt = select(UserModel.id).order_by(UserModel.id.asc())
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [UserId(int(r)) for r in rows]
+
+    async def list_user_ids_by_utm_code(self, code_id: TrackingCodeId) -> list[UserId]:
+        stmt = (
+            select(UserModel.id)
+            .where(UserModel.utm_source_code_id == int(code_id))
+            .order_by(UserModel.id.asc())
+        )
+        rows = (await self._s.execute(stmt)).scalars().all()
+        return [UserId(int(r)) for r in rows]

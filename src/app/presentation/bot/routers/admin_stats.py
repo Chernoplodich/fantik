@@ -18,6 +18,10 @@ from app.application.stats.get_dashboard import (
     GetDashboardCommand,
     GetDashboardUseCase,
 )
+from app.application.users.export_user_ids import (
+    ExportAllUserIdsUseCase,
+    ExportUserIdsCommand,
+)
 from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.infrastructure.stats.charts import (
@@ -84,10 +88,48 @@ async def refresh_overview(
     await cb.answer("Обновлено")
 
 
+# ---------- export всех user-id (.txt) ----------
+
+
+@router.callback_query(StatsCD.filter(F.dashboard == "export_users"), IsAdmin())
+@inject
+async def export_all_users(
+    cb: CallbackQuery,
+    uc: FromDishka[ExportAllUserIdsUseCase],
+) -> None:
+    """Выгрузить .txt со ВСЕМИ id зарегистрированных пользователей."""
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+    result = await uc(ExportUserIdsCommand(actor_id=cb.from_user.id))
+    if not result.user_ids:
+        await cb.answer("В базе пока нет пользователей.", show_alert=True)
+        return
+    # Только id в столбик, без BOM/заголовков.
+    body = "\n".join(str(uid) for uid in result.user_ids) + "\n"
+    document = BufferedInputFile(body.encode("utf-8"), filename="users_all.txt")
+    await cb.message.answer_document(
+        document=document,
+        caption=f"📥 Все пользователи: <b>{len(result.user_ids)}</b> id.",
+        parse_mode="HTML",
+    )
+    await cb.answer(f"Готово: {len(result.user_ids)} id")
+
+
 # ---------- второстепенные дашборды ----------
 
 
-@router.callback_query(StatsCD.filter(F.dashboard != "overview"), IsAdmin())
+# Catch-all для дашбордов кроме overview/export_users (которые имеют свои handler'ы выше).
+_DASHBOARD_KINDS: tuple[str, ...] = (
+    "tracking",
+    "authors",
+    "fandoms",
+    "moderators",
+    "cohort",
+)
+
+
+@router.callback_query(StatsCD.filter(F.dashboard.in_(_DASHBOARD_KINDS)), IsAdmin())
 @inject
 async def show_dashboard(
     cb: CallbackQuery,

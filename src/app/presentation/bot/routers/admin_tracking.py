@@ -23,6 +23,10 @@ from app.application.tracking.deactivate_code import (
 )
 from app.application.tracking.list_codes import ListTrackingCodesUseCase
 from app.application.tracking.ports import ITrackingRepository
+from app.application.users.export_user_ids import (
+    ExportUtmUserIdsCommand,
+    ExportUtmUserIdsUseCase,
+)
 from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.domain.shared.types import TrackingCodeId
@@ -224,6 +228,41 @@ async def show_funnel(
     await cb.answer()
 
 
+@router.callback_query(TrackingCD.filter(F.action == "export_users"), IsAdmin())
+@inject
+async def export_utm_users(
+    cb: CallbackQuery,
+    callback_data: TrackingCD,
+    uc: FromDishka[ExportUtmUserIdsUseCase],
+) -> None:
+    """Выгрузить .txt с id юзеров, пришедших по этой UTM-ссылке (first-touch)."""
+    if cb.from_user is None or cb.message is None:
+        await cb.answer()
+        return
+    try:
+        result = await uc(
+            ExportUtmUserIdsCommand(
+                actor_id=cb.from_user.id,
+                code_id=int(callback_data.code_id),
+            )
+        )
+    except DomainError as e:
+        await cb.answer(str(e), show_alert=True)
+        return
+    if not result.user_ids:
+        await cb.answer("По этой ссылке ещё никто не пришёл.", show_alert=True)
+        return
+    # Файл строго: id в столбик, без BOM/заголовков. Trailing \n — стандартно.
+    body = "\n".join(str(uid) for uid in result.user_ids) + "\n"
+    document = BufferedInputFile(body.encode("utf-8"), filename=f"{result.label}.txt")
+    await cb.message.answer_document(
+        document=document,
+        caption=f"📥 Выгрузка по {escape(result.label)}: <b>{len(result.user_ids)}</b> id.",
+        parse_mode="HTML",
+    )
+    await cb.answer(f"Готово: {len(result.user_ids)} id")
+
+
 @router.callback_query(TrackingCD.filter(F.action == "deactivate"), IsAdmin())
 @inject
 async def deactivate_code(
@@ -232,7 +271,7 @@ async def deactivate_code(
     uc: FromDishka[DeactivateTrackingCodeUseCase],
 ) -> None:
     if cb.from_user is None:
-        await cb.answer()
+        await cb.answer()  # type: ignore[unreachable]
         return
     try:
         await uc(DeactivateCodeCommand(code_id=callback_data.code_id, actor_id=cb.from_user.id))
