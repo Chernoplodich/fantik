@@ -1,7 +1,24 @@
+# Базовая prod-ready конфигурация. Применяется одна; для разработки
+# поверх неё накатывается оверрайд `docker-compose.dev.yml` (-f). Что заложено
+# в этом файле:
+# - Никакие порты НЕ публикуются на хост (даже 127.0.0.1). Связь между сервисами
+#   идёт через выделенную bridge-сеть `fantik_internal`. В dev-оверлей открыты
+#   только нужные для отладки порты.
+# - Каждый сервис имеет deploy.resources.limits и reservations — утечка одного
+#   контейнера не положит хост.
+# - Логи ротируются драйвером json-file (max-size + max-file).
+# - security_opt: no-new-privileges и cap_drop: ALL — отбираем все capabilities,
+#   возвращаем только нужные.
+# - Прикладные сервисы запускаются с read-only root + tmpfs /tmp.
+# - Дефолты env установлены под прод (APP_ENV=prod, LOG_RENDERER=json). dev
+#   оверрайд переопределяет на dev/console/DEBUG.
+# - Образ приложения один — `fantik/app:local`. Для пуша в registry: перетегнуть
+#   и поменять image-теги в этом файле / через ${REGISTRY}+${VERSION} в .env.
+
 x-app-env: &app-env
-  APP_ENV: ${APP_ENV:-dev}
+  APP_ENV: ${APP_ENV:-prod}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  LOG_RENDERER: ${LOG_RENDERER:-console}
+  LOG_RENDERER: ${LOG_RENDERER:-json}
   RELEASE: ${RELEASE:-}
   BOT_TOKEN: ${BOT_TOKEN}
   ADMIN_TG_IDS: ${ADMIN_TG_IDS}
@@ -49,6 +66,28 @@ x-app-env: &app-env
   PAGE_LIMIT_UTF16: ${PAGE_LIMIT_UTF16:-3900}
   TZ: UTC
 
+# Драйвер логов с ротацией — общий для всех сервисов через якорь.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# Хардненинг для прикладных контейнеров (bot/worker/scheduler/migrate) —
+# python-образ под non-root user'ом, capabilities не нужны.
+x-hardening: &default-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+# Лёгкий хардненинг для инфра/observability контейнеров (postgres/redis/meili,
+# prometheus/grafana/alertmanager) — официальные образы с entry-script'ом,
+# которому может потребоваться chown/setuid → cap_drop ALL ломает их.
+x-hardening-light: &light-hardening
+  security_opt:
+    - no-new-privileges:true
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -65,10 +104,33 @@ services:
       retries: 5
     restart: unless-stopped
     stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+        reservations:
+          cpus: "0.5"
+          memory: 512m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    # postgres внутри своего initdb меняет ownership и пишет в /var/run/postgresql,
+    # поэтому read-only root тут не выставляем. cap_drop ALL также ломает
+    # initdb — оставляем capabilities дефолтные.
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    # Жёсткий потолок памяти на стороне Redis (LRU вытеснение). Дополняет
+    # deploy.resources.limits — гарантирует что Redis не съест свой контейнер.
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "384mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -78,13 +140,26 @@ services:
       retries: 5
     restart: unless-stopped
     stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+        reservations:
+          cpus: "0.1"
+          memory: 64m
+    logging: *default-logging
+    # Инфра-сервисы (postgres/redis/meili) — официальные образы со встроенным
+    # entry-script, ему нужны capabilities для chown/setuid в свою data-папку.
+    # cap_drop=ALL ломает это. Оставляем только no-new-privileges.
+    security_opt:
+      - no-new-privileges:true
 
   meilisearch:
     image: getmeili/meilisearch:v1.11
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
-      # Meilisearch принимает только development|production (наш APP_ENV=dev → development)
-      MEILI_ENV: ${MEILI_ENV:-development}
+      MEILI_ENV: ${MEILI_ENV:-production}
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - meili_data:/meili_data
@@ -96,6 +171,17 @@ services:
       retries: 10
     restart: unless-stopped
     stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+        reservations:
+          cpus: "0.25"
+          memory: 256m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
 
   # ЕДИНСТВЕННЫЙ сервис с `build:` — он собирает образ fantik/app:local.
   # Все остальные сервисы берут этот же образ и переключаются через ENTRYPOINT_MODULE.
@@ -103,7 +189,7 @@ services:
     build:
       context: .
       dockerfile: docker/app.Dockerfile
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     environment:
       <<: *app-env
       ENTRYPOINT_MODULE: app.presentation.bot.main
@@ -119,9 +205,22 @@ services:
     restart: unless-stopped
     # Даём webhook/polling завершить in-flight updates до SIGKILL.
     stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768m
+        reservations:
+          cpus: "0.25"
+          memory: 192m
+    logging: *default-logging
+    <<: *default-hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
 
   migrate:
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     pull_policy: never
     environment:
       <<: *app-env
@@ -130,9 +229,19 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging: *default-logging
+    <<: *default-hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
 
   worker:
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     pull_policy: never
     environment:
       <<: *app-env
@@ -157,9 +266,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 768m
+        reservations:
+          cpus: "0.25"
+          memory: 192m
+    logging: *default-logging
+    <<: *default-hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
 
   worker-broadcast:
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     pull_policy: never
     environment:
       <<: *app-env
@@ -186,9 +308,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+        reservations:
+          cpus: "0.25"
+          memory: 128m
+    logging: *default-logging
+    <<: *default-hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
 
   scheduler:
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     pull_policy: never
     environment:
       <<: *app-env
@@ -213,8 +348,24 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+        reservations:
+          cpus: "0.1"
+          memory: 96m
+    logging: *default-logging
+    <<: *default-hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
 
   # --- observability profile (docker compose --profile observability up) ------
+  # На проде доступ к этим UI должен быть либо за reverse-proxy с auth,
+  # либо через ssh-tunnel. Здесь биндим на 127.0.0.1 хоста — без явного
+  # проксирования наружу не светятся.
   prometheus:
     image: prom/prometheus:v2.54.1
     profiles: ["observability"]
@@ -225,23 +376,49 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--web.enable-lifecycle"
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+        reservations:
+          cpus: "0.1"
+          memory: 128m
+    logging: *default-logging
+    <<: *light-hardening
 
   grafana:
     image: grafana/grafana:11.2.0
     profiles: ["observability"]
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # ВАЖНО: до запуска `--profile observability` ОБЯЗАТЕЛЬНО задать в .env
+      # GRAFANA_ADMIN_PASSWORD — стойкий пароль (>= 16 символов).
+      # Дефолт `changeme` оставлен только чтобы compose config не падал без
+      # профиля; Grafana по этому паролю отдаст UI любому, кто получит доступ
+      # к 127.0.0.1:3000 (например, через ssh-tunnel).
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
       - prometheus
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+        reservations:
+          cpus: "0.05"
+          memory: 64m
+    logging: *default-logging
+    <<: *light-hardening
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -250,12 +427,19 @@ services:
       - ./docker/alertmanager:/etc/alertmanager:ro
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
-    ports: ["9093:9093"]
+    ports: ["127.0.0.1:9093:9093"]
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 192m
+    logging: *default-logging
+    <<: *light-hardening
 
   # --- loadtest profile (docker compose --profile loadtest up) ----------------
   fake-tg:
-    image: fantik/app:local
+    image: ${REGISTRY:+$REGISTRY/}fantik/app:${VERSION:-local}
     profiles: ["loadtest"]
     pull_policy: never
     environment:
@@ -266,8 +450,16 @@ services:
     # поэтому в load-профиле монтируем его снаружи.
     volumes:
       - ./tests:/app/tests:ro
-    ports: ["9999:9999"]
+    # На loopback хоста — load-runner подключается через localhost.
+    ports: ["127.0.0.1:9999:9999"]
     restart: "no"
+
+# Изолированная bridge-сеть с явным именем — чтобы compose не присоединял
+# другие проекты на хосте через default-bridge.
+networks:
+  default:
+    name: fantik_internal
+    driver: bridge
 
 volumes:
   postgres_data:

@@ -1,3 +1,15 @@
+# Dev-overlay поверх docker-compose.yml. Применять обязательно вместе с базой:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Что переопределяет относительно prod-базы:
+# - публикует на 127.0.0.1 хоста: bot/worker/scheduler health+metrics порты
+#   (для curl /metrics и smoke.sh) и postgres/redis/meili (для psql/redis-cli);
+# - монтирует исходники → hot-reload без пересборки образа;
+# - LOG_LEVEL=DEBUG, LOG_RENDERER=console, APP_ENV=dev;
+# - снимает read_only с прикладных сервисов (нужно для писем bytecode и пр.).
+# Лимиты (deploy.resources, logging, security_opt) ОСТАЮТСЯ — dev тоже не должен
+# класть хост.
+
 services:
   bot:
     volumes:
@@ -5,12 +17,14 @@ services:
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
     environment:
+      APP_ENV: dev
       LOG_LEVEL: DEBUG
       LOG_RENDERER: console
       POSTGRES_ECHO: "false"
+    read_only: false
     ports:
-      - "8080:8080"
-      - "8081:8081"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
 
   worker:
     volumes:
@@ -18,45 +32,69 @@ services:
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
     environment:
+      APP_ENV: dev
       LOG_LEVEL: DEBUG
+      LOG_RENDERER: console
+    read_only: false
     # В dev пробрасываем /metrics на хост, чтобы smoke.sh и Grafana
     # (при проверке вручную без observability-профиля) могли дёрнуть.
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
 
   worker-broadcast:
     volumes:
       - ./src:/app/src:cached
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
+    environment:
+      APP_ENV: dev
+      LOG_LEVEL: DEBUG
+      LOG_RENDERER: console
+    read_only: false
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
 
   scheduler:
     volumes:
       - ./src:/app/src:cached
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
+    environment:
+      APP_ENV: dev
+      LOG_LEVEL: DEBUG
+      LOG_RENDERER: console
+    read_only: false
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
 
   migrate:
     volumes:
       - ./src:/app/src:cached
       - ./migrations:/app/migrations:cached
       - ./alembic.ini:/app/alembic.ini:cached
+    read_only: false
 
-  # Нестандартные порты, чтобы не конфликтовать с локально запущенными сервисами.
-  # Подключение с хоста: psql -h localhost -p 55432, redis-cli -p 56379, curl localhost:57700.
+  # Нестандартные порты, чтобы не конфликтовать с локально запущенными сервисами,
+  # биндим только на loopback хоста (127.0.0.1) — снаружи машины недоступны.
+  # Подключение с хоста: psql -h 127.0.0.1 -p 55432, redis-cli -p 56379, curl 127.0.0.1:57700.
   # Внутри compose-сети сервисы всё равно обращаются по стандартным портам (postgres:5432 и т.д.).
   postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantik}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-fantik}
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
 
   redis:
     ports:
-      - "56379:6379"
+      - "127.0.0.1:56379:6379"
 
   meilisearch:
+    environment:
+      # Dev-окружение: меньшая проверка ключа, аналитика всё равно отключена.
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
     ports:
-      - "57700:7700"
+      - "127.0.0.1:57700:7700"
