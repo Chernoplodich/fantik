@@ -79,13 +79,26 @@ class RegisterUserUseCase:
                     last_name=cmd.last_name,
                     language_code=cmd.language_code,
                 )
+                # Late-first-touch: если у уже зарегистрированного юзера
+                # `utm_source_code_id` ещё не присвоен, и он пришёл по UTM —
+                # привязываем (это не перезапись first-touch, а первое
+                # присвоение). Если уже было — ничего не меняем.
+                if code_id is not None:
+                    user.attach_utm_first_touch(code_id)
 
             await self._users.save(user)
 
-            # tracking: пишем события ТОЛЬКО для новых пользователей, чтобы
-            # трекинговая ссылка не раздувала переходы за счёт повторных
-            # нажатий /start от уже зарегистрированных юзеров.
-            if is_new:
+            # tracking-events:
+            # - `start` пишется (а) для новых юзеров, (б) для существующих
+            #   юзеров, пришедших по UTM-ссылке. Это нужно, чтобы воронка
+            #   рекламной ссылки видела все переходы (transitions/unique_users).
+            #   Дедупликация уникальных делается в SQL через
+            #   `count(DISTINCT user_id)`.
+            # - Существующий юзер БЕЗ UTM (просто пишет /start второй раз) —
+            #   событие не пишем, иначе таблица засоряется тапами в /start.
+            # - `register` пишется только для новых — это бизнес-инвариант
+            #   («регистрация» = первая запись в users).
+            if is_new or code_id is not None:
                 await self._tracking.record(
                     TrackingEvent(
                         id=None,
@@ -96,6 +109,7 @@ class RegisterUserUseCase:
                         created_at=now,
                     )
                 )
+            if is_new:
                 await self._tracking.record(
                     TrackingEvent(
                         id=None,
