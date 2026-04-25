@@ -172,9 +172,7 @@ async def open_tracking_card(
             [
                 "",
                 "<b>📊 Статистика за 30 дней</b>",
-                f"  🔗 Переходов по ссылке: {funnel.transitions}",
-                f"  👤 Уникальных юзеров:   {funnel.unique_users}",
-                f"  📝 Зарегистрировалось:  {funnel.registered}",
+                f"  👤 Новых пользователей: {funnel.transitions}",
                 f"  📖 Начали читать:       {funnel.first_reads}",
                 f"  ✍️ Опубликовали:        {funnel.first_publishes}",
                 f"  🚫 Заблокировали бота:  {funnel.blocked_bot}",
@@ -211,9 +209,7 @@ async def show_funnel(
     text = (
         f"📊 <b>Воронка за 30 дней</b>\n"
         f"Код: <code>{escape(str(row.code))}</code> — {escape(str(row.name))}\n\n"
-        f"🔗 Переходов по ссылке:  {row.transitions}\n"
-        f"👤 Уникальных юзеров:    {row.unique_users}\n"
-        f"📝 Зарегистрировалось:   {row.registered}\n"
+        f"👤 Новых пользователей:  {row.transitions}\n"
         f"📖 Начали читать:        {row.first_reads}\n"
         f"✍️ Опубликовали:         {row.first_publishes}\n"
         f"🚫 Заблокировали бота:   {row.blocked_bot}"

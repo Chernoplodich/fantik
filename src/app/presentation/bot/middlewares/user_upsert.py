@@ -1,6 +1,18 @@
-"""Middleware: upsert пользователя при каждом апдейте. ТОЛЬКО last_seen / имя / username.
+"""Middleware: touch существующего пользователя при каждом апдейте.
 
-Регистрация полноценная (включая запись tracking-события) выполняется в /start hand'е.
+ВАЖНО: этот middleware НЕ создаёт пользователя — только обновляет last_seen
+и username/имя у уже зарегистрированных. Создание выполняет ТОЛЬКО
+роутер `/start` через `RegisterUserUseCase`. Это гарантирует, что:
+
+- UTM-атрибуция first-touch корректно ставится при первичной регистрации
+  (юзер не «съедается» middleware'ом до того, как handler /start увидит
+  payload `?start=<utm>` и создаст user с правильным `utm_source_code_id`);
+- tracking-события `start` / `register` пишутся ровно один раз — при
+  истинной первой регистрации, не при каждом апдейте.
+
+Если юзер шлёт что-то ДО первого /start (callback из чужого forward'а
+или ручной апдейт через API) — middleware просто пропускает; downstream-
+middleware (role/ban_check) дефолтят на USER без записи в БД.
 """
 
 from __future__ import annotations
@@ -16,14 +28,13 @@ from dishka.integrations.aiogram import CONTAINER_NAME
 
 from app.application.users.ports import IUserRepository
 from app.domain.shared.types import UserId
-from app.domain.users.entities import User as UserEntity
 from app.infrastructure.db.unit_of_work import UnitOfWork
 
 _UPDATE_EVERY_SECONDS = 60  # если last_seen моложе — не дергаем DB
 
 
 class UserUpsertMiddleware(BaseMiddleware):
-    """Берёт контейнер из data (его положил dishka middleware) и делает upsert."""
+    """Touch существующего user'а. Создание — задача `/start` (см. модуль)."""
 
     async def __call__(
         self,
@@ -44,18 +55,11 @@ class UserUpsertMiddleware(BaseMiddleware):
                 async with uow:
                     existing = await users.get(UserId(from_user.id))
                     if existing is None:
-                        # Создадим минимального пользователя; /start сделает полную регистрацию.
-                        user = UserEntity(
-                            id=UserId(from_user.id),
-                            username=from_user.username,
-                            first_name=from_user.first_name,
-                            last_name=from_user.last_name,
-                            language_code=from_user.language_code,
-                            created_at=now,
-                            last_seen_at=now,
-                        )
-                        await users.save(user)
-                        await uow.commit()
+                        # Не создаём — этим займётся /start handler.
+                        # Если апдейт пришёл не от /start (любой текст /
+                        # callback), просто пропускаем — downstream middleware
+                        # умеют работать с user=None.
+                        pass
                     elif (
                         existing.last_seen_at is None
                         or (now - existing.last_seen_at).total_seconds() >= _UPDATE_EVERY_SECONDS

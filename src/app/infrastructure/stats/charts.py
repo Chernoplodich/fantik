@@ -33,18 +33,17 @@ def _import_plt() -> tuple[Any, Any]:
 
 def render_funnel_png(row: FunnelRow) -> bytes:
     _, plt = _import_plt()
+    # `start` пишется только при первой регистрации, поэтому
+    # transitions / unique_users / registered всегда равны — показываем один
+    # бар «Новых пользователей» вместо трёх дублирующихся.
     labels = [
-        "Переходы",
-        "Уникальные",
-        "Регистрации",
+        "Новых пользователей",
         "Начали читать",
         "Опубликовали",
         "Заблокировали",
     ]
     values = [
         row.transitions,
-        row.unique_users,
-        row.registered,
         row.first_reads,
         row.first_publishes,
         row.blocked_bot,
@@ -53,7 +52,7 @@ def render_funnel_png(row: FunnelRow) -> bytes:
     bars = ax.bar(
         labels,
         values,
-        color=["#4C78A8", "#72B7B2", "#F58518", "#54A24B", "#B279A2", "#E45756"],
+        color=["#4C78A8", "#54A24B", "#B279A2", "#E45756"],
     )
     for bar, value in zip(bars, values, strict=True):
         ax.text(

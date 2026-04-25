@@ -206,20 +206,22 @@ def _format_overview_caption(ov) -> str:  # type: ignore[no-untyped-def]
 
 
 async def _render_tracking(*, cb: CallbackQuery, data: DashboardData) -> None:
-    """Старый трекинг-дашборд: переходы / регистрации / первые чтения / публикации."""
+    """Дашборд трекинг-событий: новые юзеры / первые чтения / публикации.
+
+    `start` пишется только при первой регистрации, поэтому starts == registers
+    всегда — показываем одной строкой «Новых пользователей».
+    """
     rows = data.daily or []
     if rows:
         lines = ["📈 <b>Трекинг-события за 30 дней</b>", ""]
         total = {
             "starts": sum(r.starts for r in rows),
-            "registers": sum(r.registers for r in rows),
             "first_reads": sum(r.first_reads for r in rows),
             "first_publishes": sum(r.first_publishes for r in rows),
         }
-        lines.append(f"🔗 Переходов:        {total['starts']}")
-        lines.append(f"📝 Регистраций:      {total['registers']}")
-        lines.append(f"📖 Начали читать:    {total['first_reads']}")
-        lines.append(f"✍️ Опубликовали:     {total['first_publishes']}")
+        lines.append(f"👤 Новых пользователей: {total['starts']}")
+        lines.append(f"📖 Начали читать:       {total['first_reads']}")
+        lines.append(f"✍️ Опубликовали:        {total['first_publishes']}")
         caption = "\n".join(lines)
     else:
         caption = (

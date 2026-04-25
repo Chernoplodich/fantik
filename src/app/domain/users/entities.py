@@ -97,22 +97,6 @@ class User(EventEmitter):
         if language_code is not None:
             self.language_code = language_code
 
-    def attach_utm_first_touch(self, code_id: TrackingCodeId) -> bool:
-        """Late-присвоение first-touch UTM, если у юзера его ещё не было.
-
-        Сценарий: юзер зашёл первый раз без UTM (например, через @username),
-        а потом кликнул по рекламной ссылке `?start=<code>`. Атрибуция
-        first-touch остаётся за этим первым кодом — он становится «первым»
-        для атрибуции, потому что до этого юзер вообще не был привязан.
-
-        Возвращает True если присвоили, False если уже было непустое
-        значение (никогда не перезаписываем — это и есть first-touch).
-        """
-        if self.utm_source_code_id is not None:
-            return False
-        self.utm_source_code_id = code_id
-        return True
-
     def set_author_nick(self, nick: AuthorNick) -> None:
         if self.author_nick is not None:
             raise AuthorNickAlreadySetError(
