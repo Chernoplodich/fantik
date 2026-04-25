@@ -86,8 +86,11 @@ from app.application.reading.save_progress import SaveProgressUseCase
 from app.application.reading.toggle_bookmark import ToggleBookmarkUseCase
 from app.application.reading.toggle_like import ToggleLikeUseCase
 from app.application.reference.fandoms_crud import (
+    CategoryStatsAdminUseCase,
     CreateFandomUseCase,
     ListFandomsAdminUseCase,
+    ListFandomsByCategoryAdminUseCase,
+    SearchFandomsAdminUseCase,
     UpdateFandomUseCase,
 )
 from app.application.reference.ports import (
@@ -1084,6 +1087,20 @@ class UseCasesProvider(Provider):
     @provide
     def list_fandoms_admin_uc(self, repo: IFandomAdminRepository) -> ListFandomsAdminUseCase:
         return ListFandomsAdminUseCase(repo)
+
+    @provide
+    def list_fandoms_by_category_admin_uc(
+        self, repo: IFandomAdminRepository
+    ) -> ListFandomsByCategoryAdminUseCase:
+        return ListFandomsByCategoryAdminUseCase(repo)
+
+    @provide
+    def search_fandoms_admin_uc(self, repo: IFandomAdminRepository) -> SearchFandomsAdminUseCase:
+        return SearchFandomsAdminUseCase(repo)
+
+    @provide
+    def category_stats_admin_uc(self, repo: IFandomAdminRepository) -> CategoryStatsAdminUseCase:
+        return CategoryStatsAdminUseCase(repo)
 
     @provide
     def create_fandom_uc(

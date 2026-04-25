@@ -22,7 +22,7 @@ def build_mod_menu_kb() -> InlineKeyboardMarkup:
     reports_btn = mod_reports_menu_button()
     b.button(text=reports_btn.text, callback_data=reports_btn.callback_data or "noop")
     b.button(text="← Главное меню", callback_data="menu:back")
-    b.adjust(1)
+    b.adjust(2, 1)
     return b.as_markup()
 
 

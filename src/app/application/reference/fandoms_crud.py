@@ -189,3 +189,41 @@ class ListFandomsAdminUseCase:
 
     async def __call__(self, *, active_only: bool = False) -> list[FandomAdminRow]:
         return await self._repo.list_all(active_only=active_only)
+
+
+class ListFandomsByCategoryAdminUseCase:
+    """Постраничный листинг фандомов в категории (включая inactive)."""
+
+    def __init__(self, repo: IFandomAdminRepository) -> None:
+        self._repo = repo
+
+    async def __call__(
+        self, *, category: str, limit: int = 10, offset: int = 0
+    ) -> tuple[list[FandomAdminRow], int]:
+        return await self._repo.list_by_category(category=category, limit=limit, offset=offset)
+
+
+class SearchFandomsAdminUseCase:
+    """Админский поиск фандомов по name+aliases (включая inactive)."""
+
+    def __init__(self, repo: IFandomAdminRepository) -> None:
+        self._repo = repo
+
+    async def __call__(
+        self,
+        *,
+        query: str,
+        limit: int = 30,
+        category: str | None = None,
+    ) -> list[FandomAdminRow]:
+        return await self._repo.search(query=query, limit=limit, category=category)
+
+
+class CategoryStatsAdminUseCase:
+    """Счётчики активных фандомов на категорию (для бейджей в picker)."""
+
+    def __init__(self, repo: IFandomAdminRepository) -> None:
+        self._repo = repo
+
+    async def __call__(self) -> dict[str, int]:
+        return await self._repo.count_by_category()

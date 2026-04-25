@@ -157,6 +157,34 @@ class FakeFandomAdminRepo(IFandomAdminRepository):
     async def update(self, **kwargs: Any) -> FandomAdminRow:
         raise NotImplementedError
 
+    async def list_by_category(
+        self, *, category: str, limit: int, offset: int
+    ) -> tuple[list[FandomAdminRow], int]:
+        rows = [r for r in self._by_id.values() if r.category == category]
+        return rows[offset : offset + limit], len(rows)
+
+    async def search(
+        self,
+        *,
+        query: str,
+        limit: int = 30,
+        category: str | None = None,
+    ) -> list[FandomAdminRow]:
+        q = query.lower()
+        rows = [
+            r
+            for r in self._by_id.values()
+            if q in r.name.lower() and (category is None or r.category == category)
+        ]
+        return rows[:limit]
+
+    async def count_by_category(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for r in self._by_id.values():
+            if r.active:
+                out[r.category] = out.get(r.category, 0) + 1
+        return out
+
 
 class FakeNotifier(IFandomProposalNotifier):
     def __init__(self) -> None:

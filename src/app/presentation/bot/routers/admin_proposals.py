@@ -33,6 +33,7 @@ from app.presentation.bot.fsm.states.admin_proposals import (
     FandomProposalReviewFlow,
 )
 from app.presentation.bot.keyboards.admin_fandom_proposals import (
+    build_proposal_approve_category_kb,
     build_proposal_card_kb,
     build_proposals_list_kb,
 )
@@ -103,14 +104,44 @@ async def open_proposal(
     await cb.answer()
 
 
-@router.callback_query(FandomProposalAdminCD.filter(F.action == "approve"), IsAdmin())
+@router.callback_query(FandomProposalAdminCD.filter(F.action == "approve_pick"), IsAdmin())
 @inject
-async def approve_proposal(
+async def approve_pick_category(
+    cb: CallbackQuery,
+    callback_data: FandomProposalAdminCD,
+    repo: FromDishka[IFandomProposalRepository],
+) -> None:
+    """Шаг 1 approve: показать picker категорий с предзаполненной категорией."""
+    proposal = await repo.get(ProposalId(int(callback_data.pid)))
+    if proposal is None:
+        await cb.answer("Заявка не найдена.", show_alert=True)
+        return
+    body = (
+        f"📋 <b>Заявка #{int(proposal.id)}</b>\n\n"
+        f"Название: <b>{escape(proposal.name)}</b>\n\n"
+        "Выбери категорию для фандома (предложенная отмечена ✅).\n"
+        "Клик создаст фандом."
+    )
+    await render(
+        cb,
+        body,
+        reply_markup=build_proposal_approve_category_kb(
+            pid=int(proposal.id), current_cat=proposal.category_hint
+        ),
+        parse_mode="HTML",
+    )
+    await cb.answer()
+
+
+@router.callback_query(FandomProposalAdminCD.filter(F.action == "approve_do"), IsAdmin())
+@inject
+async def approve_do(
     cb: CallbackQuery,
     callback_data: FandomProposalAdminCD,
     approve_uc: FromDishka[ApproveFandomProposalUseCase],
     list_uc: FromDishka[ListPendingFandomProposalsUseCase],
 ) -> None:
+    """Шаг 2 approve: создаёт фандом с выбранной категорией."""
     if cb.from_user is None:
         return  # type: ignore[unreachable]
     try:
@@ -118,6 +149,7 @@ async def approve_proposal(
             ApproveFandomProposalCommand(
                 actor_id=cb.from_user.id,
                 proposal_id=int(callback_data.pid),
+                category=callback_data.cat or None,
             )
         )
     except DomainError as e:

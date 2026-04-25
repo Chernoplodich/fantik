@@ -48,10 +48,14 @@ class FandomAdminCD(CallbackData, prefix="fd"):
 
 
 class FandomProposalAdminCD(CallbackData, prefix="fdp"):
-    """Админ-операции над заявкой на фандом."""
+    """Админ-операции над заявкой на фандом.
 
-    action: str  # list / open / approve / reject
+    `cat` используется для двухшагового approve: pick → do.
+    """
+
+    action: str  # list / open / approve_pick / approve_do / reject
     pid: int = 0
+    cat: str = ""
 
 
 class TagAdminCD(CallbackData, prefix="tg"):

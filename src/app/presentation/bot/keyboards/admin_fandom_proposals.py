@@ -10,6 +10,7 @@ from app.presentation.bot.callback_data.admin import (
     AdminCD,
     FandomProposalAdminCD,
 )
+from app.presentation.bot.fandom_categories import CATEGORIES, get_category
 
 
 def _short(text: str, limit: int = 36) -> str:
@@ -42,7 +43,7 @@ def build_proposal_card_kb(pid: int) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(
         text="✅ Одобрить",
-        callback_data=FandomProposalAdminCD(action="approve", pid=pid).pack(),
+        callback_data=FandomProposalAdminCD(action="approve_pick", pid=pid).pack(),
     )
     b.button(
         text="❌ Отклонить",
@@ -50,4 +51,27 @@ def build_proposal_card_kb(pid: int) -> InlineKeyboardMarkup:
     )
     b.button(text="⟵ К списку", callback_data=AdminCD(action="proposals").pack())
     b.adjust(2, 1)
+    return b.as_markup()
+
+
+def build_proposal_approve_category_kb(*, pid: int, current_cat: str) -> InlineKeyboardMarkup:
+    """Picker категорий перед approve. Текущая категория помечена ✅.
+
+    Один клик по категории создаёт фандом сразу — отдельного шага «подтверждение»
+    нет, чтобы не плодить попап-диалоги.
+    """
+    current = get_category(current_cat).code
+    b = InlineKeyboardBuilder()
+    for cat in CATEGORIES:
+        prefix = "✅ " if cat.code == current else ""
+        b.button(
+            text=f"{prefix}{cat.short_label}",
+            callback_data=FandomProposalAdminCD(action="approve_do", pid=pid, cat=cat.code).pack(),
+        )
+    b.button(
+        text="⟵ Отмена",
+        callback_data=FandomProposalAdminCD(action="open", pid=pid).pack(),
+    )
+    # 11 категорий по 2 в ряд + последняя одна (Other) + 1 «Отмена».
+    b.adjust(2, 2, 2, 2, 2, 1, 1)
     return b.as_markup()

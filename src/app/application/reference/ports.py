@@ -54,6 +54,33 @@ class IFandomAdminRepository(Protocol):
         active: bool | None = None,
     ) -> FandomAdminRow: ...
 
+    async def list_by_category(
+        self, *, category: str, limit: int, offset: int
+    ) -> tuple[list[FandomAdminRow], int]:
+        """Все фандомы категории (включая inactive). Сортировка по name asc.
+
+        Возвращает (page, total) для пагинации.
+        """
+        ...
+
+    async def search(
+        self,
+        *,
+        query: str,
+        limit: int = 30,
+        category: str | None = None,
+    ) -> list[FandomAdminRow]:
+        """Поиск по name + aliases (ILIKE), включая inactive.
+
+        Минимальная длина запроса — 2 символа. Сортировка: prefix-match → name asc.
+        Если задана `category`, ограничивает выборку категорией.
+        """
+        ...
+
+    async def count_by_category(self) -> dict[str, int]:
+        """Счётчик активных фандомов на категорию (для бейджей в picker)."""
+        ...
+
 
 class ITagAdminRepository(Protocol):
     async def merge(self, *, canonical_id: TagId, source_ids: list[TagId]) -> int:
