@@ -12,11 +12,19 @@ from app.application.reading.ports import (
     IPageCache,
     IReadsCompletedRepository,
 )
+from app.application.tracking.record_event import (
+    RecordEventCommand,
+    RecordEventUseCase,
+)
 from app.core.errors import NotFoundError
+from app.core.logging import get_logger
 from app.domain.fanfics.entities import Chapter, Fanfic
 from app.domain.fanfics.services.paginator import ChapterPaginator, Page
 from app.domain.fanfics.value_objects import FicStatus
 from app.domain.shared.types import ChapterId, FanficId, UserId
+from app.domain.tracking.value_objects import TrackingEventType
+
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,6 +60,7 @@ class ReadPageUseCase:
         bookmarks: IBookmarksRepository,
         likes: ILikesRepository,
         reads_completed: IReadsCompletedRepository,
+        record_event: RecordEventUseCase | None = None,
     ) -> None:
         self._fanfics = fanfics
         self._chapters = chapters
@@ -60,6 +69,8 @@ class ReadPageUseCase:
         self._bookmarks = bookmarks
         self._likes = likes
         self._reads_completed = reads_completed
+        # Опциональный — для тестов. В DI всегда инжектим реальный.
+        self._record_event = record_event
 
     async def __call__(self, cmd: ReadPageCommand) -> ReadPageResult:
         fic_id = FanficId(cmd.fic_id)
@@ -112,6 +123,30 @@ class ReadPageUseCase:
         already_completed = (
             await self._reads_completed.exists(user_id, ch_id) if is_last_page_in_chapter else False
         )
+
+        # tracking-событие `first_read`: пишем при первой странице любой главы
+        # любого ЧУЖОГО approved-фика. only_once=True гарантирует, что событие
+        # запишется ровно раз на юзера; повторные клики «следующая страница»
+        # не вызывают этот блок (page_no != 1 → пропуск). Чтение собственных
+        # фиков автором не считается событием воронки.
+        if (
+            self._record_event is not None
+            and not viewer_is_author
+            and cmd.page_no == 1
+            and chapter.status == FicStatus.APPROVED
+        ):
+            try:
+                await self._record_event(
+                    RecordEventCommand(
+                        user_id=int(user_id),
+                        event_type=TrackingEventType.FIRST_READ,
+                        payload={"fic_id": int(fic_id), "chapter_id": int(ch_id)},
+                        only_once=True,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                # Tracking — best-effort. Любая ошибка не должна ломать чтение.
+                log.warning("first_read_record_failed", exc=str(exc), user_id=int(user_id))
 
         return ReadPageResult(
             fic=fic,

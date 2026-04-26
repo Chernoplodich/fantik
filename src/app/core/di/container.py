@@ -748,9 +748,19 @@ class UseCasesProvider(Provider):
         audit: IAuditLog,
         notifier: IAuthorNotifier,
         clock: Clock,
+        record_event: RecordEventUseCase,
     ) -> ApproveUseCase:
         return ApproveUseCase(
-            uow, moderation, fanfics, chapters, versions, outbox, audit, notifier, clock
+            uow,
+            moderation,
+            fanfics,
+            chapters,
+            versions,
+            outbox,
+            audit,
+            notifier,
+            clock,
+            record_event=record_event,
         )
 
     @provide
@@ -818,9 +828,17 @@ class UseCasesProvider(Provider):
         bookmarks: IBookmarksRepository,
         likes: ILikesRepository,
         reads_completed: IReadsCompletedRepository,
+        record_event: RecordEventUseCase,
     ) -> ReadPageUseCase:
         return ReadPageUseCase(
-            fanfics, chapters, pages, page_cache, bookmarks, likes, reads_completed
+            fanfics,
+            chapters,
+            pages,
+            page_cache,
+            bookmarks,
+            likes,
+            reads_completed,
+            record_event=record_event,
         )
 
     @provide

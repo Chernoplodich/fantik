@@ -14,12 +14,20 @@ from app.application.fanfics.ports import (
 )
 from app.application.moderation.ports import IAuditLog, IModerationRepository
 from app.application.shared.ports import UnitOfWork
+from app.application.tracking.record_event import (
+    RecordEventCommand,
+    RecordEventUseCase,
+)
 from app.core.clock import Clock
 from app.core.errors import NotFoundError
+from app.core.logging import get_logger
 from app.core.metrics import MODERATION_DECISION_LATENCY, MODERATION_DECISIONS
 from app.domain.fanfics.value_objects import FicStatus
 from app.domain.moderation.exceptions import CaseAlreadyDecidedError
 from app.domain.shared.types import FanficId, FanficVersionId, ModerationCaseId, UserId
+from app.domain.tracking.value_objects import TrackingEventType
+
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -42,6 +50,7 @@ class ApproveUseCase:
         audit: IAuditLog,
         notifier: IAuthorNotifier,
         clock: Clock,
+        record_event: RecordEventUseCase | None = None,
     ) -> None:
         self._uow = uow
         self._moderation = moderation
@@ -52,6 +61,8 @@ class ApproveUseCase:
         self._audit = audit
         self._notifier = notifier
         self._clock = clock
+        # Опциональный — для тестов; в DI всегда инжектится реальный.
+        self._record_event = record_event
 
     async def __call__(self, cmd: ApproveCommand) -> None:
         now = self._clock.now()
@@ -170,3 +181,24 @@ class ApproveUseCase:
                 )
             except Exception:
                 pass
+
+        # tracking-событие `first_publish`: пишется один раз на автора при
+        # самом первом одобрении его фика (`fic.first_published_at IS NULL`
+        # в момент входа в use case). only_once=True страхует от дублей,
+        # если флаг was_first_publish ошибочно проставится дважды.
+        # Тоже после commit — чтобы при крахе approve-транзакции не было
+        # фантомного события в воронке.
+        if was_first_publish and notify_author_id is not None and self._record_event is not None:
+            try:
+                await self._record_event(
+                    RecordEventCommand(
+                        user_id=int(notify_author_id),
+                        event_type=TrackingEventType.FIRST_PUBLISH,
+                        payload={"fic_id": int(notify_fic_id) if notify_fic_id else 0},
+                        only_once=True,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "first_publish_record_failed", exc=str(exc), author_id=int(notify_author_id)
+                )
