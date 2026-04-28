@@ -1121,6 +1121,7 @@ async def chapter_card(
         reply_markup=build_chapter_actions_kb(
             fic_id=callback_data.fic_id,
             chapter_id=int(ch.id),
+            chapter_number=int(ch.number),
             status=ch.status,
         ),
     )

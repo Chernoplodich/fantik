@@ -162,10 +162,15 @@ def build_chapter_list_kb(
 
 
 def build_chapter_actions_kb(
-    *, fic_id: int, chapter_id: int, status: FicStatus
+    *, fic_id: int, chapter_id: int, chapter_number: int, status: FicStatus
 ) -> InlineKeyboardMarkup:
-    """Действия над главой: Править / Удалить — только для не-approved."""
+    """Действия над главой: Читать / Править / Удалить."""
     b = InlineKeyboardBuilder()
+    if status != FicStatus.ARCHIVED:
+        b.button(
+            text="📖 Читать",
+            callback_data=ReadNav(a="chapter", f=int(fic_id), c=int(chapter_number), p=1).pack(),
+        )
     if status in (FicStatus.DRAFT, FicStatus.REJECTED, FicStatus.REVISING):
         b.button(
             text="✏️ Изменить текст",
